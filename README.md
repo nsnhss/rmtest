@@ -19,7 +19,7 @@
 | 插件生态 | 用户自写 checker 文件级分发，`loadCheckersFromDir` 动态加载，坏插件隔离 |
 | 桌面应用 | `pnpm desktop`：扫描/维护/内容/AI 生成/场景库/运行中心六视图 |
 
-**测试：138 个，全部通过**（`pnpm test`；含 14 个真实引擎验证测试，设置 `RM_REAL_PROJECT` 指向你的 MV/MZ 工程即启用）；类型检查 `pnpm typecheck`。
+**测试：148 个，全部通过**（`pnpm test`；含 14 个真实引擎验证测试，设置 `RM_REAL_PROJECT` 指向你的 MV/MZ 工程即启用）；类型检查 `pnpm typecheck`。
 
 ## 快速开始
 

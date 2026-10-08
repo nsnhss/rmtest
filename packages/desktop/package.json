@@ -1,0 +1,13 @@
+{
+  "name": "@rmtest/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/main.cjs",
+  "dependencies": {
+    "@rmtest/cli": "workspace:*"
+  },
+  "devDependencies": {
+    "@rmtest/runtime": "workspace:*"
+  }
+}

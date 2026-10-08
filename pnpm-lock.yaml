@@ -175,6 +175,9 @@ importers:
       electron:
         specifier: ^44.6.0
         version: 44.6.0
+      esbuild:
+        specifier: ^0.28.2
+        version: 0.28.2
       puppeteer-core:
         specifier: ^25.12.0
         version: 25.12.0
@@ -226,6 +229,16 @@ importers:
         version: link:../report
 
   packages/core: {}
+
+  packages/desktop:
+    dependencies:
+      '@rmtest/cli':
+        specifier: workspace:*
+        version: link:../cli
+    devDependencies:
+      '@rmtest/runtime':
+        specifier: workspace:*
+        version: link:../runtime
 
   packages/dsl:
     dependencies:

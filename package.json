@@ -13,12 +13,15 @@
     "test": "vitest run",
     "spike:mv": "tsx packages/adapters/mv/spike/parse.ts",
     "spike:runtime": "tsx packages/runtime/spike/run.ts",
-    "scan": "tsx packages/cli/src/main.ts"
+    "scan": "tsx packages/cli/src/main.ts",
+    "desktop:build": "esbuild packages/desktop/src/main.ts --bundle --platform=node --format=cjs --external:electron --outfile=packages/desktop/dist/main.cjs && esbuild packages/desktop/src/renderer.ts --bundle --format=iife --outfile=packages/desktop/app/dist/renderer.js",
+    "desktop": "pnpm desktop:build && pnpm exec electron packages/desktop"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",
     "@types/pngjs": "^6.0.5",
     "electron": "^44.6.0",
+    "esbuild": "^0.28.2",
     "puppeteer-core": "^25.12.0",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",

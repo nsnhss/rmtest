@@ -135,15 +135,21 @@ export class ProjectStore {
 
   // —— 游戏指纹 ——
   setGameFingerprint(fp: string): void {
-    this.#db
-      .prepare("INSERT INTO meta (key, value) VALUES ('game_fingerprint', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
-      .run(fp);
+    this.setMeta("game_fingerprint", fp);
   }
 
   getGameFingerprint(): string | null {
-    const row = this.#db.prepare("SELECT value FROM meta WHERE key = 'game_fingerprint'").get() as
-      | { value: string }
-      | undefined;
+    return this.getMeta("game_fingerprint");
+  }
+
+  setMeta(key: string, value: string): void {
+    this.#db
+      .prepare("INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+      .run(key, value);
+  }
+
+  getMeta(key: string): string | null {
+    const row = this.#db.prepare("SELECT value FROM meta WHERE key = ?").get(key) as { value: string } | undefined;
     return row?.value ?? null;
   }
 

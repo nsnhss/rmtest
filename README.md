@@ -8,17 +8,17 @@
 
 | 能力 | 说明 |
 |---|---|
-| 静态扫描 | `pnpm scan <工程目录>` → 控制台摘要 + `rmtest-report.html`（按严重度/置信度分组，带编辑器坐标） |
+| 静态扫描 | `pnpm scan <工程目录> [--incremental]` → 控制台摘要 + `rmtest-report.html`；增量模式基于内容哈希报变更文件、无变更跳过 |
 | 语料维护 | `pnpm maintain <工程目录> <语料.json>` → fresh/broken/stale 三分类 + 机械重链 |
-| 13 个检查器 | 悬空引用、大小写、资源规格、脸图/图标越界、图片出屏、对话溢出、条件恒假、死逻辑、传送软锁（越界/卡墙/死格）、地图可达性、CJK 字体缺失 |
-| 动态测试（真实引擎） | 场景 DSL 执行 `run`、随机探索 `fuzz`、截图基线 `golden`、键盘录制 `record`、一键回归 `regress`——全部跑在真实 MV/MZ 引擎上（需要你的工程） |
+| 14 个检查器 | 悬空引用、大小写、资源规格、脸图/图标越界、图片出屏、对话溢出、条件恒假、死逻辑、传送软锁（越界/卡墙/死格）、地图可达性、CJK 字体缺失、首触发恒假 |
+| 动态测试（真实引擎） | 场景 DSL 执行 `run`（walk 走真实瓦片通行性路径、choose 真实选项导航）、随机探索 `fuzz`、截图基线 `golden`、键盘录制 `record`、一键回归 `regress`——全部跑在真实 MV/MZ 引擎上 |
 | 时效性引擎 | fresh/broken/stale 三分类 + 内容哈希机械重链（地图 + 开关个体粒度） |
 | AI 层 | `aigen` 自然语言生成场景（校验闸门循环）、`repair` 过时场景修复提案、`explain` 失败轨迹翻译——本地 Ollama，判定始终在确定性引擎 |
 | 部署验收 | `deploy` 命令：加密产物解析 + 大小写专项 + 字体检查 |
 | 插件生态 | 用户自写 checker 文件级分发，`loadCheckersFromDir` 动态加载，坏插件隔离 |
 | 桌面应用 | `pnpm desktop`：扫描/维护/内容/AI 生成/场景库/运行中心六视图 |
 
-**测试：133 个，全部通过**（`pnpm test`；含 9 个真实引擎验证测试，设置 `RM_REAL_PROJECT` 指向你的 MV/MZ 工程即启用）；类型检查 `pnpm typecheck`。
+**测试：138 个，全部通过**（`pnpm test`；含 14 个真实引擎验证测试，设置 `RM_REAL_PROJECT` 指向你的 MV/MZ 工程即启用）；类型检查 `pnpm typecheck`。
 
 ## 快速开始
 

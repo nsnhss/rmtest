@@ -8,6 +8,7 @@ import { pictureNoEraseChecker, pictureOffscreenChecker } from "./checkers/pictu
 import { unreachableMapChecker } from "./checkers/reachability.ts";
 import { transferSoftlockChecker } from "./checkers/transfer.ts";
 import { fontChecker } from "./checkers/font.ts";
+import { firstRunFalseChecker } from "./checkers/first-run-false.ts";
 import { textOverflowChecker } from "./checkers/text-overflow.ts";
 
 export const checkers: CheckerPlugin[] = [
@@ -23,6 +24,7 @@ export const checkers: CheckerPlugin[] = [
   transferSoftlockChecker,
   unreachableMapChecker,
   fontChecker,
+  firstRunFalseChecker,
 ];
 
 export { danglingRefChecker, assetDimensionChecker, faceIndexChecker, iconIndexChecker, pictureOffscreenChecker, pictureNoEraseChecker, textOverflowChecker };

@@ -88,4 +88,27 @@ describe("扫描管线端到端", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it("增量扫描：基线 → 变更检测 → 无变更跳过", () => {
+    const dir = buildDemo(false);
+    try {
+      // 首次增量：无基线 → changedFiles 为 null
+      const first = scan(dir, { incremental: true });
+      expect(first.changedFiles).toBeNull();
+      expect(first.unchanged).toBe(false);
+
+      // 无变更 → 跳过重扫
+      const second = scan(dir, { incremental: true });
+      expect(second.unchanged).toBe(true);
+      expect(second.counts).toEqual({ error: 0, warning: 0, info: 0 });
+
+      // 改一个文件 → 报出该文件
+      writeFileSync(path.join(dir, "data", "Items.json"), '["改"]');
+      const third = scan(dir, { incremental: true });
+      expect(third.unchanged).toBe(false);
+      expect(third.changedFiles).toContain("data/Items.json");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });

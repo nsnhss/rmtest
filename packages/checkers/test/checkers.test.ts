@@ -278,6 +278,59 @@ describe("checkers v1", () => {
     }
   });
 
+  it("写入点全在判断之后 → first-run-false", () => {
+    const p = buildProject(fullAssets());
+    try {
+      p.writeJson("Map001.json", (d) => {
+        const ev1 = (d["events"] as Array<Record<string, unknown> | null>)[1]!;
+        const page = (ev1["pages"] as Array<Record<string, unknown>>)[0]!;
+        const list = page["list"] as Array<Record<string, unknown>>;
+        // 开关 2：页内唯一写入在判断之后
+        list.splice(list.length - 1, 0, { code: 111, indent: 0, parameters: [0, 2] });
+        list.splice(list.length - 1, 0, { code: 121, indent: 1, parameters: [2, 2, 0] });
+        list.splice(list.length - 1, 0, { code: 412, indent: 0, parameters: [] });
+      });
+      const sections = run(p.loaded()).sections;
+      const hit = sections.filter((s) => s.type === "first-run-false");
+      expect(hit).toHaveLength(1);
+      expect(hit[0]).toMatchObject({ severity: "warning", confidence: "medium" });
+      expect(hit[0]!.message).toContain("开关 2");
+    } finally {
+      p.destroy();
+    }
+  });
+
+  it("页内写入在后且无外部写入 → 报；有外部写入 → 不报", () => {
+    const p = buildProject(fullAssets());
+    try {
+      // 开关 2：页内写入在判断后，页外无写入（公共事件写的是开关 1）→ 报
+      p.writeJson("Map001.json", (d) => {
+        const ev1 = (d["events"] as Array<Record<string, unknown> | null>)[1]!;
+        const page = (ev1["pages"] as Array<Record<string, unknown>>)[0]!;
+        const list = page["list"] as Array<Record<string, unknown>>;
+        list.splice(list.length - 1, 0, { code: 111, indent: 0, parameters: [0, 2] });
+        list.splice(list.length - 1, 0, { code: 121, indent: 1, parameters: [2, 2, 0] });
+        list.splice(list.length - 1, 0, { code: 412, indent: 0, parameters: [] });
+      });
+      let sections = run(p.loaded()).sections;
+      expect(sections.filter((s) => s.type === "first-run-false" && s.message.includes("开关 2"))).toHaveLength(1);
+
+      // 开关 1：公共事件也写它（页外写入）→ 无法证明，不报
+      p.writeJson("Map001.json", (d) => {
+        const ev1 = (d["events"] as Array<Record<string, unknown> | null>)[1]!;
+        const page = (ev1["pages"] as Array<Record<string, unknown>>)[0]!;
+        const list = page["list"] as Array<Record<string, unknown>>;
+        list.splice(list.length - 1, 0, { code: 111, indent: 0, parameters: [0, 1] });
+        list.splice(list.length - 1, 0, { code: 121, indent: 1, parameters: [1, 1, 0] });
+        list.splice(list.length - 1, 0, { code: 412, indent: 0, parameters: [] });
+      });
+      sections = run(p.loaded()).sections;
+      expect(sections.filter((s) => s.type === "first-run-false" && s.message.includes("开关 1"))).toHaveLength(0);
+    } finally {
+      p.destroy();
+    }
+  });
+
   it("插件抛异常 → 记录错误，其余检查器照跑（内核隔离）", () => {
     const p = buildProject(fullAssets());
     try {

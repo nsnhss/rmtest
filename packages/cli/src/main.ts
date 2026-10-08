@@ -271,12 +271,22 @@ if (cmd === "maintain") {
   }
 } else {
   const projectDir = path.resolve(process.argv[3] ?? ".");
-  const summary = scan(projectDir);
-  const reportPath = path.join(projectDir, "rmtest-report.html");
-  writeFileSync(reportPath, summary.html);
-  console.log(`错误 ${summary.counts.error} · 警告 ${summary.counts.warning} · 提示 ${summary.counts.info}`);
-  if (summary.loadWarnings.length > 0) console.log(`加载警告 ${summary.loadWarnings.length} 条`);
-  if (summary.pluginErrors.length > 0) console.log(`插件错误 ${summary.pluginErrors.length} 条`);
-  console.log(`报告: ${reportPath}`);
-  process.exitCode = summary.counts.error > 0 ? 1 : 0;
+  const incremental = process.argv.includes("--incremental");
+  const summary = scan(projectDir, { incremental });
+  if (summary.unchanged) {
+    console.log("无变更，跳过重扫");
+    process.exitCode = 0;
+  } else {
+    const reportPath = path.join(projectDir, "rmtest-report.html");
+    writeFileSync(reportPath, summary.html);
+    console.log(`错误 ${summary.counts.error} · 警告 ${summary.counts.warning} · 提示 ${summary.counts.info}`);
+    if (summary.changedFiles !== null) {
+      console.log(`变更 ${summary.changedFiles.length} 个文件:`);
+      for (const f of summary.changedFiles) console.log(`  ${f}`);
+    }
+    if (summary.loadWarnings.length > 0) console.log(`加载警告 ${summary.loadWarnings.length} 条`);
+    if (summary.pluginErrors.length > 0) console.log(`插件错误 ${summary.pluginErrors.length} 条`);
+    console.log(`报告: ${reportPath}`);
+    process.exitCode = summary.counts.error > 0 ? 1 : 0;
+  }
 }

@@ -1,0 +1,89 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>rmtest-spike</title></head>
+<body>
+<!--
+  P0 验证线 2：模拟 MV 运行时表面（Game_Interpreter + $gameSwitches），
+  验证「CDP 驱动 + 事件解释器逐步执行 + 状态断言」的机制。
+  真实引擎（rpg_objects.js 等）的保真验证需要用户自有的 MV/MZ 工程。
+-->
+<script>
+"use strict";
+
+window.$gameSwitches = {
+  _data: new Array(5000).fill(false),
+  setValue(id, value) { this._data[id] = !!value; },
+  value(id) { return !!this._data[id]; },
+};
+
+class Game_Interpreter {
+  constructor() {
+    this._list = null;
+    this._index = 0;
+    this._finished = false;
+    this._eventId = 0;
+    this._data = { switches: window.$gameSwitches, transfer: null };
+  }
+  setup(list, eventId) {
+    this._list = list;
+    this._index = 0;
+    this._finished = false;
+    this._eventId = eventId;
+  }
+  isRunning() { return this._list !== null && !this._finished; }
+  // 真实引擎的 update 一帧只推进若干命令；spike 用 runToEnd 循环驱动
+  step() {
+    if (!this.isRunning()) return;
+    const cmd = this._list[this._index];
+    if (cmd.code === 0) { this._finished = true; return; }
+    this.executeCommand(cmd);
+    this._index++;
+    if (this._index >= this._list.length) this._finished = true;
+  }
+  executeCommand(cmd) {
+    const p = cmd.parameters;
+    switch (cmd.code) {
+      case 121: // Control Switches: [startId, endId, op] op=0 时 ON
+        for (let i = p[0]; i <= p[1]; i++) this._data.switches.setValue(i, p[2] === 0);
+        break;
+      case 122: // Control Variables（spike 仅记录）
+        break;
+      case 201: // Transfer Player: [mapId, x, y, dir, fade]
+        this._data.transfer = { mapId: p[0], x: p[1], y: p[2] };
+        break;
+      case 101: // Show Text：真实引擎会等待玩家确认，spike 直接跳过
+      case 401: // Show Text 续行
+      case 117: // Call Common Event
+      case 0:
+        break;
+    }
+  }
+}
+window.Game_Interpreter = Game_Interpreter;
+
+window.__spike = {
+  interpreter: null,
+  reset() {
+    this.interpreter = new Game_Interpreter();
+    return this;
+  },
+  runEvent(list, eventId) {
+    this.interpreter.setup(list, eventId ?? 0);
+    let guard = 0;
+    while (this.interpreter.isRunning() && guard++ < 10000) this.interpreter.step();
+    return this.snapshot();
+  },
+  snapshot() {
+    const sw = this.interpreter._data.switches;
+    return {
+      finished: this.interpreter._finished,
+      eventId: this.interpreter._eventId,
+      switch12: sw.value(12),
+      switch2: sw.value(2),
+      transfer: this.interpreter._data.transfer,
+    };
+  },
+};
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{
+  "gameTitle": "MiniFixture",
+  "switches": ["", "任务开关", "门已开"],
+  "variables": ["", "计数"],
+  "startMapId": 1,
+  "startX": 3,
+  "startY": 4,
+  "encryptionKey": "d41d8cd98f00b204e9800998ecf8427e",
+  "versionId": 1
+}

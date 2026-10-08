@@ -1,0 +1,25 @@
+{
+  "name": "rmtest",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "RPG Maker 自动化 bug 检测器：静态分析 + 语义检查 + 动态执行测试",
+  "packageManager": "pnpm@12.10.1",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "spike:mv": "tsx packages/adapters/mv/spike/parse.ts",
+    "spike:runtime": "tsx packages/runtime/spike/run.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "electron": "^44.6.0",
+    "puppeteer-core": "^25.12.0",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
+  }
+}

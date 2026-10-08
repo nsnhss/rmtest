@@ -1,0 +1,13 @@
+[
+  null,
+  {
+    "id": 1,
+    "name": "公共事件1",
+    "trigger": 0,
+    "switchId": 1,
+    "list": [
+      { "code": 121, "indent": 0, "parameters": [2, 2, 0] },
+      { "code": 0, "indent": 0, "parameters": [] }
+    ]
+  }
+]

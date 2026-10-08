@@ -1,0 +1,13 @@
+{
+  "name": "@rmtest/runtime",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@rmtest/core": "workspace:*",
+    "puppeteer-core": "^25.12.0"
+  }
+}

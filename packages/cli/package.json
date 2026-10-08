@@ -12,6 +12,7 @@
     "@rmtest/checkers": "workspace:*",
     "@rmtest/report": "workspace:*",
     "@rmtest/dsl": "workspace:*",
-    "@rmtest/freshness": "workspace:*"
+    "@rmtest/freshness": "workspace:*",
+    "@rmtest/ai": "workspace:*"
   }
 }

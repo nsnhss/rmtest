@@ -1,11 +1,13 @@
 /**
  * CLI 入口：
- *   pnpm scan <工程目录>                       — 静态扫描出 HTML 报告
- *   pnpm maintain <工程目录> <语料.json>       — 语料维护报告（三分类 + 重链）
- *   pnpm content <工程目录> [基线.json] [--save] — 新内容检测（可达事件页 diff）
+ *   pnpm scan <工程目录>                          — 静态扫描出 HTML 报告
+ *   pnpm maintain <工程目录> <语料.json>          — 语料维护报告（三分类 + 重链）
+ *   pnpm content <工程目录> [基线.json] [--save]  — 新内容检测（可达事件页 diff）
+ *   pnpm aigen <工程目录> "自然语言需求"           — AI 生成测试场景（需 Ollama + 聊天模型）
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { aigen, defaultProvider } from "./aigen.ts";
 import { contentReport } from "./content.ts";
 import { maintain } from "./maintain.ts";
 import { scan } from "./scan.ts";
@@ -79,6 +81,26 @@ if (cmd === "maintain") {
     const out = baselinePath ?? path.join(projectDir, "rmtest-baseline.json");
     writeFileSync(out, JSON.stringify({ keys: report.keys }, null, 2));
     console.log(`基线已写入: ${out}`);
+  }
+} else if (cmd === "aigen") {
+  const projectDir = path.resolve(process.argv[3] ?? ".");
+  const nl = process.argv[4] ?? "";
+  if (!nl) {
+    console.error("用法: pnpm aigen <工程目录> \"自然语言测试需求\"");
+    process.exit(2);
+  }
+  try {
+    const outcome = await aigen(projectDir, nl, defaultProvider());
+    if (outcome.error) {
+      console.error(`生成失败（${outcome.attempts} 次尝试）: ${outcome.error}`);
+      for (const f of outcome.feedback) console.error(`  反馈: ${f}`);
+      process.exit(1);
+    }
+    console.log(outcome.scenarioJson);
+    console.error(`（${outcome.attempts} 次尝试通过校验闸门）`);
+  } catch (err) {
+    console.error(`AI 调用失败（Ollama 未运行或无聊天模型？）: ${err instanceof Error ? err.message : String(err)}`);
+    process.exit(2);
   }
 } else {
   const projectDir = path.resolve(process.argv[3] ?? ".");

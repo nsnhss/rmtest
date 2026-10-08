@@ -197,6 +197,15 @@ importers:
         specifier: workspace:*
         version: link:../../core
 
+  packages/ai:
+    dependencies:
+      '@rmtest/core':
+        specifier: workspace:*
+        version: link:../core
+      '@rmtest/dsl':
+        specifier: workspace:*
+        version: link:../dsl
+
   packages/checkers:
     dependencies:
       '@rmtest/core':
@@ -212,6 +221,9 @@ importers:
       '@rmtest/adapter-mv':
         specifier: workspace:*
         version: link:../adapters/mv
+      '@rmtest/ai':
+        specifier: workspace:*
+        version: link:../ai
       '@rmtest/checkers':
         specifier: workspace:*
         version: link:../checkers

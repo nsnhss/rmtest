@@ -14,8 +14,10 @@
 | 动态测试机制 | 场景 DSL + 校验闸门 + 执行器（断言/失败即停）+ 覆盖计数 + fuzz + 求解器补测 + golden 截图 diff（当前在 stub 运行时上验证机制，真实引擎接入见路线图） |
 | 时效性引擎 | 测试实例与游戏内容的绑定指纹：fresh/broken/stale 三分类、内容哈希机械重链 |
 | 插件生态 | 用户自写 checker 从目录动态加载，坏插件隔离 |
+| AI 场景生成 | `pnpm aigen <工程> "自然语言需求"` → 校验闸门循环 → 合法场景 JSON（本地 Ollama + 聊天模型；判定与执行始终在确定性引擎，AI 只做翻译） |
+| 桌面应用 | `pnpm desktop`：扫描/维护/新内容三视图 |
 
-**测试：90 个，全部通过**（`pnpm test`）；类型检查 `pnpm typecheck`。
+**测试：111 个，全部通过**（`pnpm test`）；类型检查 `pnpm typecheck`。
 
 ## 快速开始
 
@@ -28,6 +30,8 @@ pnpm typecheck
 # 用起来
 pnpm scan ./你的MV工程
 pnpm maintain ./你的MV工程 ./corpus.json [--apply]
+pnpm aigen ./你的MV工程 "测试屠龙任务的完整流程"   # 需要 Ollama + 聊天模型（默认 qwen3:1.7b）
+pnpm desktop                                          # 桌面应用
 ```
 
 语料 JSON 格式（场景 DSL）示例：

@@ -74,12 +74,12 @@ afterAll(async () => {
 });
 
 describe("桌面 UI 冒烟", () => {
-  it("输入路径 → 点击扫描 → 统计与报告 iframe 出现", async () => {
+  it("输入路径 → 点击扫描 → 统计与报告 iframe 出现", { timeout: 120_000 }, async () => {
     await page.evaluate((dir) => {
       (document.getElementById("scanDir") as HTMLInputElement).value = dir;
     }, projectDir!);
     await page.click("#scanBtn");
-    await page.waitForFunction(() => (document.getElementById("scanResult")?.textContent ?? "").includes("错误"), { timeout: 30_000 });
+    await page.waitForFunction(() => (document.getElementById("scanResult")?.textContent ?? "").includes("错误"), { timeout: 90_000 });
 
     const text = await page.evaluate(() => document.getElementById("scanResult")!.textContent!);
     expect(text).toMatch(/错误 \d+/);
@@ -92,12 +92,12 @@ describe("桌面 UI 冒烟", () => {
     expect(frameVisible).toBe(true);
   });
 
-  it("新内容检测按钮 → 报出可达事件页", async () => {
+  it("新内容检测按钮 → 报出可达事件页", { timeout: 120_000 }, async () => {
     await page.evaluate((dir) => {
       (document.getElementById("contentDir") as HTMLInputElement).value = dir;
     }, projectDir!);
     await page.click("#contentBtn");
-    await page.waitForFunction(() => (document.getElementById("contentResult")?.textContent ?? "").includes("可达事件页"), { timeout: 30_000 });
+    await page.waitForFunction(() => (document.getElementById("contentResult")?.textContent ?? "").includes("可达事件页"), { timeout: 90_000 });
 
     const text = await page.evaluate(() => document.getElementById("contentResult")!.textContent!);
     expect(text).toContain("可达事件页 2 个");

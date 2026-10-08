@@ -103,4 +103,15 @@ describe("桌面 UI 冒烟", () => {
     expect(text).toContain("可达事件页 2 个");
     expect(text).toContain("无基线");
   });
+
+  it("场景库列表按钮 → 空语料报告", { timeout: 120_000 }, async () => {
+    await page.evaluate((dir) => {
+      (document.getElementById("corpusDir") as HTMLInputElement).value = dir;
+    }, projectDir!);
+    await page.click("#corpusListBtn");
+    await page.waitForFunction(() => (document.getElementById("corpusResult")?.textContent ?? "").includes("语料"), { timeout: 90_000 });
+
+    const text = await page.evaluate(() => document.getElementById("corpusResult")!.textContent!);
+    expect(text).toContain("语料 0 个场景");
+  });
 });

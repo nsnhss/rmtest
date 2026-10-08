@@ -6,7 +6,7 @@ import { app, BrowserWindow, ipcMain } from "electron";
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { contentReport, maintain, scan } from "@rmtest/cli";
+import { aigen, defaultProvider, contentReport, corpusAdd, corpusList, maintain, regressCli, scan } from "@rmtest/cli";
 
 ipcMain.handle("scan", (_e, dir: string) => {
   const summary = scan(dir);
@@ -54,6 +54,38 @@ ipcMain.handle("content", (_e, dir: string, baselinePath: string | null) => {
     }
   }
   return contentReport(dir, baselineKeys);
+});
+
+ipcMain.handle("aigen", async (_e, dir: string, nl: string) => {
+  const outcome = await aigen(dir, nl, defaultProvider());
+  return {
+    scenarioJson: outcome.scenarioJson,
+    attempts: outcome.attempts,
+    feedback: outcome.feedback,
+    error: outcome.error,
+  };
+});
+
+ipcMain.handle("corpus-list", (_e, dir: string) => {
+  const entries = corpusList(dir);
+  return { entries, count: entries.length };
+});
+
+ipcMain.handle("corpus-add", (_e, dir: string, scenarioPath: string) => {
+  const r = corpusAdd(dir, scenarioPath);
+  return { id: r.id, steps: r.steps };
+});
+
+ipcMain.handle("regress", async (_e, dir: string) => {
+  const summary = await regressCli(dir);
+  return {
+    passed: summary.passed,
+    failed: summary.failed,
+    skipped: summary.skipped,
+    details: summary.items.map(
+      (i) => `[${i.outcome}] (${i.status}) ${i.scenarioId}${i.message ? ` — ${i.message}` : ""}`,
+    ),
+  };
 });
 
 app.whenReady().then(() => {

@@ -13,10 +13,12 @@ import path from "node:path";
 import { aigen, defaultProvider } from "./aigen.ts";
 import { contentReport } from "./content.ts";
 import { corpusAdd, corpusList } from "./corpus.ts";
+import { explainFailure } from "./explain.ts";
 import { fuzzCli } from "./fuzz.ts";
 import { goldenCli } from "./golden.ts";
 import { maintain } from "./maintain.ts";
 import { regressCli } from "./regress.ts";
+import { repairCli } from "./repair.ts";
 import { runScenarioCli } from "./run.ts";
 import { scan } from "./scan.ts";
 
@@ -203,6 +205,56 @@ if (cmd === "maintain") {
     process.exitCode = summary.failed > 0 ? 1 : 0;
   } catch (err) {
     console.error(`regress 失败: ${err instanceof Error ? err.message : String(err)}`);
+    process.exit(2);
+  }
+} else if (cmd === "explain") {
+  const projectDir = path.resolve(process.argv[3] ?? ".");
+  const scenarioPath = process.argv[4] ? path.resolve(process.argv[4]) : "";
+  if (!scenarioPath) {
+    console.error("用法: pnpm explain <工程目录> <场景.json>");
+    process.exit(2);
+  }
+  try {
+    const result = await runScenarioCli(projectDir, scenarioPath);
+    if (result.passed) {
+      console.log("场景通过，无需解释");
+      process.exitCode = 0;
+    } else {
+      const report = await explainFailure(
+        { scenarioId: result.scenarioId, stepResults: result.stepResults, finalSnapshot: result.finalSnapshot },
+        defaultProvider(),
+      );
+      console.log(report);
+      process.exitCode = 1;
+    }
+  } catch (err) {
+    console.error(`explain 失败: ${err instanceof Error ? err.message : String(err)}`);
+    process.exit(2);
+  }
+} else if (cmd === "repair") {
+  const projectDir = path.resolve(process.argv[3] ?? ".");
+  const corpusPath = process.argv[4] ? path.resolve(process.argv[4]) : "";
+  if (!corpusPath) {
+    console.error("用法: pnpm repair <工程目录> <语料.json>");
+    process.exit(2);
+  }
+  try {
+    const raw = JSON.parse(readFileSync(corpusPath, "utf8"));
+    if (!Array.isArray(raw)) throw new Error("语料文件必须是场景数组");
+    const outcome = await repairCli(projectDir, raw, defaultProvider());
+    console.log(`stale 场景 ${outcome.staleCount} 个，提案 ${outcome.proposals.length} 个:`);
+    for (const p of outcome.proposals) {
+      console.log(`\n=== ${p.scenarioId} ===`);
+      if (p.scenarioJson) {
+        console.log(p.scenarioJson);
+        console.log(`（${p.attempts} 次尝试过闸门）`);
+      } else {
+        console.log(`提案失败: ${p.error}`);
+        for (const f of p.feedback) console.log(`  反馈: ${f}`);
+      }
+    }
+  } catch (err) {
+    console.error(`repair 失败: ${err instanceof Error ? err.message : String(err)}`);
     process.exit(2);
   }
 } else {

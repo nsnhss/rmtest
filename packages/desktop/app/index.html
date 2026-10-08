@@ -43,6 +43,30 @@
     <pre class="result" id="contentResult"></pre>
   </section>
 
+  <section>
+    <h2>AI 场景生成（本地 Ollama）</h2>
+    <input type="text" id="aiDir" placeholder="工程目录">
+    <input type="text" id="aiPrompt" placeholder="测试需求，如：测试屠龙任务的完整流程">
+    <button id="aiBtn">生成场景</button>
+    <pre class="result" id="aiResult"></pre>
+  </section>
+
+  <section>
+    <h2>场景库（回归语料）</h2>
+    <input type="text" id="corpusDir" placeholder="工程目录">
+    <input type="text" id="corpusAddPath" placeholder="场景 JSON 路径（入库）">
+    <button id="corpusAddBtn">入库</button>
+    <button id="corpusListBtn">列出</button>
+    <pre class="result" id="corpusResult"></pre>
+  </section>
+
+  <section>
+    <h2>运行中心（一键回归）</h2>
+    <input type="text" id="regressDir" placeholder="工程目录">
+    <button id="regressBtn">回归全部场景</button>
+    <pre class="result" id="regressResult"></pre>
+  </section>
+
   <script src="dist/renderer.js"></script>
 </body>
 </html>

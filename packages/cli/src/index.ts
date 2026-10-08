@@ -7,3 +7,5 @@ export * from "./fuzz.ts";
 export * from "./golden.ts";
 export * from "./corpus.ts";
 export * from "./regress.ts";
+export * from "./explain.ts";
+export * from "./repair.ts";

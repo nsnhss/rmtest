@@ -53,21 +53,17 @@ function extractJson(text: string): string | null {
   return stripped.slice(start, end + 1);
 }
 
-export async function generateScenario(
-  nl: string,
-  surface: GameSurface,
+/** 共享闸门循环：任何"AI 提案场景"都必须过 schema + 引用校验，不过打回重写 */
+async function runGate(
+  userPrompt: string,
   ir: IRDocument,
   universe: GameUniverse,
   provider: ChatProvider,
-  opts: GenerateOptions = {},
+  maxAttempts: number,
 ): Promise<GenerateResult> {
-  const maxAttempts = opts.maxAttempts ?? 3;
   const messages: ChatMessage[] = [
     { role: "system", content: SYSTEM_PROMPT },
-    {
-      role: "user",
-      content: `游戏表面（只能引用这些实体）:\n${JSON.stringify(surface)}\n\n测试需求（自然语言）:\n${nl}\n\n请生成场景 JSON。`,
-    },
+    { role: "user", content: userPrompt },
   ];
 
   const feedback: string[] = [];
@@ -116,4 +112,16 @@ export async function generateScenario(
   }
 
   return { scenario: null, attempts: maxAttempts, feedback, error: feedback[feedback.length - 1] ?? "未知错误" };
+}
+
+export async function generateScenario(
+  nl: string,
+  surface: GameSurface,
+  ir: IRDocument,
+  universe: GameUniverse,
+  provider: ChatProvider,
+  opts: GenerateOptions = {},
+): Promise<GenerateResult> {
+  const userPrompt = `游戏表面（只能引用这些实体）:\n${JSON.stringify(surface)}\n\n测试需求（自然语言）:\n${nl}\n\n请生成场景 JSON。`;
+  return runGate(userPrompt, ir, universe, provider, opts.maxAttempts ?? 3);
 }

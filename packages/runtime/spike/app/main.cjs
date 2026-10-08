@@ -7,7 +7,7 @@ app.whenReady().then(() => {
     width: 816,
     height: 624,
     show: false,
-    webPreferences: { contextIsolation: false, nodeIntegration: false, offscreen: true },
+    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, offscreen: true },
   });
   win.loadFile(path.join(__dirname, "fixture.html"));
 });

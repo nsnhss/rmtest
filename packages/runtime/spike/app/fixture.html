@@ -30,10 +30,42 @@ class Game_Interpreter {
   step() {
     if (!this.isRunning()) return;
     const cmd = this._list[this._index];
-    if (cmd.code === 0) { this._finished = true; return; }
+    if (!cmd || cmd.code === 0) { this._finished = true; return; }
+    if (cmd.code === 111) {
+      const taken = this._evalCondition(cmd);
+      this._data.onBranch?.(cmd, taken);
+      this._index++;
+      if (!taken) {
+        // 假：跳到 else(411) 体，或跳过 412 结束标记
+        while (this._index < this._list.length) {
+          const c = this._list[this._index];
+          if ((c.code === 411 || c.code === 412) && c.indent === cmd.indent) { this._index++; return; }
+          if (c.indent <= cmd.indent) return;
+          this._index++;
+        }
+      }
+      return;
+    }
+    if (cmd.code === 411) {
+      // 真体撞上 else：跳到 412 之后
+      this._index++;
+      while (this._index < this._list.length) {
+        const c = this._list[this._index];
+        if (c.code === 412 && c.indent === cmd.indent) { this._index++; return; }
+        if (c.indent <= cmd.indent) return;
+        this._index++;
+      }
+      return;
+    }
+    if (cmd.code === 412) { this._index++; return; }
     this.executeCommand(cmd);
     this._index++;
     if (this._index >= this._list.length) this._finished = true;
+  }
+  _evalCondition(cmd) {
+    const p = cmd.parameters;
+    if (Number(p[0]) === 0) return this._data.switches.value(Number(p[1]));
+    return false;
   }
   executeCommand(cmd) {
     const p = cmd.parameters;
@@ -61,24 +93,40 @@ const WORLD_START = { mapId: 1, x: 2, y: 2 };
 window.__game = (() => {
   const world = { ...WORLD_START, switches: {}, variables: {}, transfer: null };
   const interp = new Game_Interpreter();
+  const counters = { pages: {}, branches: {} };
 
-  // 地图 1 (2,2) 的事件：开开关 1 → 传送到地图 2 (2,2)
+  // 地图 1 (2,2) 的事件：对话 → 开开关 1 → 分支(开关1 ON: 开开关2 / else: 开开关3) → 传送地图 2
   const events = {
     "1:2:2": [
       { code: 101, indent: 0, parameters: ["", 0, 0, 2] },
       { code: 401, indent: 1, parameters: ["你好，世界"] },
       { code: 121, indent: 0, parameters: [1, 1, 0] },
+      { code: 111, indent: 0, parameters: [0, 1] },
+      { code: 121, indent: 1, parameters: [2, 2, 0] },
+      { code: 411, indent: 0, parameters: [] },
+      { code: 121, indent: 1, parameters: [3, 3, 0] },
+      { code: 412, indent: 0, parameters: [] },
       { code: 201, indent: 0, parameters: [2, 2, 2, 0, 0] },
       { code: 0, indent: 0, parameters: [] },
     ],
   };
 
-  function runList(list) {
+  function runList(list, key) {
     const switches = {
       setValue(id, v) { world.switches[id] = !!v; },
       value(id) { return !!world.switches[id]; },
     };
-    interp.setup(list, 1, { switches, transfer: null });
+    counters.pages[`${key}:0`] = (counters.pages[`${key}:0`] || 0) + 1;
+    interp.setup(list, 1, {
+      switches,
+      transfer: null,
+      onBranch(_cmd, taken) {
+        const b = counters.branches[key] || { taken: 0, total: 0 };
+        b.total += 1;
+        if (taken) b.taken += 1;
+        counters.branches[key] = b;
+      },
+    });
     let guard = 0;
     while (interp.isRunning() && guard++ < 10000) interp.step();
     if (interp._data.transfer) world.transfer = interp._data.transfer;
@@ -98,10 +146,14 @@ window.__game = (() => {
       world.y = y;
     },
     interact() {
-      const list = events[`${world.mapId}:${world.x}:${world.y}`];
-      if (list) runList(list);
+      const key = `${world.mapId}:${world.x}:${world.y}`;
+      const list = events[key];
+      if (list) runList(list, key);
     },
     choose() { /* stub: 无对话分支 */ },
+    counters() {
+      return JSON.parse(JSON.stringify(counters));
+    },
     snapshot() {
       return {
         mapId: world.mapId,

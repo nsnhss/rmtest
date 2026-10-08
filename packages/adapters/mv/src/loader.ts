@@ -21,6 +21,8 @@ export interface LoadedProject {
   universe: GameUniverse;
   assets: AssetInfo[];
   fingerprint: string;
+  /** relPath → 文件内容哈希（重链/时效性依据） */
+  fileHashes: Map<string, string>;
   warnings: string[];
 }
 
@@ -72,7 +74,7 @@ export function loadProject(dir: string, engine: "mv" | "mz" = "mv"): LoadedProj
   const iconSet = assets.find((a) => a.relPath.toLowerCase() === "img/system/iconset.png");
   if (iconSet) universe.iconCount = Math.floor(iconSet.width / 32) * Math.floor(iconSet.height / 32);
 
-  return { ir, universe, assets, fingerprint: fingerprintTree(fileHashes), warnings };
+  return { ir, universe, assets, fingerprint: fingerprintTree(fileHashes), fileHashes, warnings };
 }
 
 function collectAssets(

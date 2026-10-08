@@ -254,6 +254,15 @@ importers:
         specifier: ^25.12.0
         version: 25.12.0
 
+  packages/store:
+    dependencies:
+      '@rmtest/core':
+        specifier: workspace:*
+        version: link:../core
+      '@rmtest/dsl':
+        specifier: workspace:*
+        version: link:../dsl
+
 packages:
 
   '@electron-internal/extract-zip@1.0.5':

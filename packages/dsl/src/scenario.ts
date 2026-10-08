@@ -19,13 +19,23 @@ export const StepSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("assert_map"), map: z.number().int().positive() }),
 ]);
 
+export const BindingSchema = z.object({
+  kind: z.enum(["map", "switch", "variable"]),
+  id: z.number().int().positive(),
+  /** 绑定实体的内容哈希（重链依据；地图=数据文件哈希） */
+  hash: z.string().min(1),
+});
+
 export const ScenarioSchema = z.object({
   id: z.string().min(1),
   /** 创建时对应的游戏内容指纹（可选；时效性引擎用） */
   game_fingerprint: z.string().optional(),
+  /** 场景依赖的实体绑定（可选；过时重链用） */
+  bindings: z.array(BindingSchema).optional(),
   steps: z.array(StepSchema).min(1),
 });
 
 export type Scenario = z.infer<typeof ScenarioSchema>;
 export type ScenarioStep = z.infer<typeof StepSchema>;
 export type WalkStep = z.infer<typeof WalkStep>;
+export type ScenarioBinding = z.infer<typeof BindingSchema>;

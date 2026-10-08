@@ -21,23 +21,24 @@ export interface RealSnapshot {
   variables: Array<number | null>;
   transferring: boolean;
   transferTarget: { mapId: number; x: number; y: number } | null;
+  mapId: number;
+  playerX: number;
+  playerY: number;
+  eventRunning: boolean;
+  messageBusy: boolean;
 }
 
 const BRIDGE = `(() => {
   if (window.__rmtestReal) return "exists";
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   window.__rmtestReal = {
     ready() {
       return typeof DataManager !== "undefined" && DataManager.isDatabaseLoaded()
         && typeof SceneManager !== "undefined" && !SceneManager.isSceneChanging();
     },
     setupNewGame() {
+      // 保留引擎自带的开局传送：Scene_Map 靠 $gamePlayer.newMapId() 决定加载哪张地图
       DataManager.setupNewGame();
-      // 引擎自带的开局传送（系统起始点）是启动流程，不是被测命令的效果；
-      // 清掉它保证测试前置状态确定。
-      $gamePlayer._transferring = false;
-      $gamePlayer._newMapId = 0;
-      $gamePlayer._newX = 0;
-      $gamePlayer._newY = 0;
     },
     async runEvent(list) {
       // 真实引擎语义：
@@ -52,18 +53,50 @@ const BRIDGE = `(() => {
         if (interp._waitMode) return "waiting";
         if (Date.now() > deadline) return "timeout";
         interp.update();
-        await new Promise((r) => setTimeout(r, 0)); // 让出事件循环，允许游戏帧推进
+        await sleep(0); // 让出事件循环，允许游戏帧推进
       }
     },
+    // —— 场景级：进入地图、触发事件、模拟按键、存档 ——
+    async enterMapScene() {
+      SceneManager.goto(Scene_Map);
+      const deadline = Date.now() + 20000;
+      while (!(SceneManager._scene && SceneManager._scene.constructor === Scene_Map
+          && typeof $gameMap !== "undefined" && $gameMap._mapId > 0
+          && !SceneManager.isSceneChanging())) {
+        if (Date.now() > deadline) return false;
+        await sleep(30);
+      }
+      return true;
+    },
+    async gotoMap() {
+      this.setupNewGame();
+      return this.enterMapScene();
+    },
+    setPlayer(x, y) { $gamePlayer.locate(x, y); },
+    // 触发 (x,y) 处"确定键"类型的事件（真实引擎的玩家交互路径）
+    triggerAt(x, y) { $gamePlayer.startMapEvent(x, y, [0], true); },
+    pressOk() {
+      Input._currentState["ok"] = true;
+      Input._previousState["ok"] = false;
+    },
+    isEventRunning() { return $gameMap.isEventRunning(); },
+    messageBusy() { return $gameMessage.isBusy(); },
+    saveGame(slot) { return DataManager.saveGame(slot); },
+    loadGame(slot) { return DataManager.loadGame(slot); },
     snapshot() {
       return {
-        ready: DataManager.isDatabaseLoaded(),
+        ready: typeof DataManager !== "undefined" && DataManager.isDatabaseLoaded(),
         switches: [1,2,3,4,5].map((i) => ($gameSwitches.value(i) ? 1 : 0)),
         variables: [1,2,3].map((i) => $gameVariables.value(i)),
         transferring: $gamePlayer.isTransferring(),
         transferTarget: $gamePlayer.isTransferring()
           ? { mapId: $gamePlayer._newMapId, x: $gamePlayer._newX, y: $gamePlayer._newY }
           : null,
+        mapId: typeof $gameMap !== "undefined" ? $gameMap._mapId : 0,
+        playerX: $gamePlayer._x,
+        playerY: $gamePlayer._y,
+        eventRunning: typeof $gameMap !== "undefined" ? $gameMap.isEventRunning() : false,
+        messageBusy: $gameMessage.isBusy(),
       };
     },
   };
@@ -142,4 +175,72 @@ export async function closeRealGame(session: RealGameSession): Promise<void> {
       // 已断连
     }
   });
+}
+
+// —— 场景级 Node 侧助手 ——
+
+interface RealBridge {
+  ready: () => boolean;
+  setupNewGame: () => void;
+  runEvent: (list: unknown[]) => Promise<"finished" | "waiting" | "timeout">;
+  enterMapScene: () => Promise<boolean>;
+  gotoMap: () => Promise<boolean>;
+  setPlayer: (x: number, y: number) => void;
+  triggerAt: (x: number, y: number) => void;
+  pressOk: () => void;
+  isEventRunning: () => boolean;
+  messageBusy: () => boolean;
+  saveGame: (slot: number) => boolean;
+  loadGame: (slot: number) => boolean;
+  snapshot: () => RealSnapshot;
+}
+
+type RealWindow = { __rmtestReal: RealBridge };
+
+export async function gotoMap(page: Page): Promise<boolean> {
+  return (await page.evaluate(() => (window as unknown as RealWindow).__rmtestReal.gotoMap())) as boolean;
+}
+
+export async function enterMapScene(page: Page): Promise<boolean> {
+  return (await page.evaluate(() => (window as unknown as RealWindow).__rmtestReal.enterMapScene())) as boolean;
+}
+
+export async function triggerAt(page: Page, x: number, y: number): Promise<void> {
+  await page.evaluate(
+    (pos: { tx: number; ty: number }) => (window as unknown as RealWindow).__rmtestReal.triggerAt(pos.tx, pos.ty),
+    { tx: x, ty: y },
+  );
+}
+
+export async function pressOk(page: Page): Promise<void> {
+  await page.evaluate(() => (window as unknown as RealWindow).__rmtestReal.pressOk());
+}
+
+export async function saveGame(page: Page, slot: number): Promise<boolean> {
+  return (await page.evaluate((s) => (window as unknown as RealWindow).__rmtestReal.saveGame(s), slot)) as boolean;
+}
+
+export async function loadGame(page: Page, slot: number): Promise<boolean> {
+  return (await page.evaluate((s) => (window as unknown as RealWindow).__rmtestReal.loadGame(s), slot)) as boolean;
+}
+
+export async function snapshotReal(page: Page): Promise<RealSnapshot> {
+  return (await page.evaluate(() => (window as unknown as RealWindow).__rmtestReal.snapshot())) as RealSnapshot;
+}
+
+/** 轮询快照直到条件满足或超时 */
+export async function waitForSnapshot(
+  page: Page,
+  cond: (s: RealSnapshot) => boolean,
+  timeoutMs = 15_000,
+  intervalMs = 100,
+): Promise<RealSnapshot> {
+  const deadline = Date.now() + timeoutMs;
+  let last: RealSnapshot = await snapshotReal(page);
+  while (Date.now() < deadline) {
+    if (cond(last)) return last;
+    await new Promise((r) => setTimeout(r, intervalMs));
+    last = await snapshotReal(page);
+  }
+  return last;
 }

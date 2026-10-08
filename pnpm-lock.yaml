@@ -227,6 +227,15 @@ importers:
         specifier: ^4.0.0
         version: 4.6.5
 
+  packages/freshness:
+    dependencies:
+      '@rmtest/core':
+        specifier: workspace:*
+        version: link:../core
+      '@rmtest/dsl':
+        specifier: workspace:*
+        version: link:../dsl
+
   packages/report:
     dependencies:
       '@rmtest/core':

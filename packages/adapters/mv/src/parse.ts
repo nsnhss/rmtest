@@ -221,7 +221,7 @@ function parseCommands(raw: unknown): IRCommand[] {
   if (!Array.isArray(raw)) return [];
   return raw
     .filter(isRecord)
-    .map((c) => ({ code: Number(c["code"] ?? 0), parameters: (c["parameters"] ?? []) as unknown[] }));
+    .map((c) => ({ code: Number(c["code"] ?? 0), indent: Number(c["indent"] ?? 0), parameters: (c["parameters"] ?? []) as unknown[] }));
 }
 
 function normalizeNameList(raw: unknown): string[] {

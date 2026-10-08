@@ -119,6 +119,8 @@ export const Cmd = {
 
 export interface IRCommand {
   code: number;
+  /** 嵌套缩进层级，条件分支体判定用 */
+  indent: number;
   parameters: unknown[];
 }
 

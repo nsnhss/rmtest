@@ -6,4 +6,5 @@ export * from "./guards.ts";
 export * from "./universe.ts";
 export * from "./facts/refgraph.ts";
 export * from "./facts/lifecycle.ts";
+export * from "./facts/reachables.ts";
 export * from "./kernel.ts";

@@ -98,6 +98,7 @@ export const Cmd = {
   CallCommonEvent: 117,
   ControlSwitches: 121,
   ControlVariables: 122,
+  ControlSelfSwitch: 123,
   ChangeItems: 126,
   ChangeWeapons: 127,
   ChangeArmors: 128,

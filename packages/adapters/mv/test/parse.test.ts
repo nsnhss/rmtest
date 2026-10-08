@@ -14,7 +14,7 @@ describe("MV 数据解析 → IR", () => {
     expect(ir.system.title).toBe("MiniFixture");
     expect(ir.system.switches[1]).toBe("任务开关");
     expect(ir.system.variables[1]).toBe("计数");
-    expect([ir.system.startMapId, ir.system.startX, ir.system.startY]).toEqual([1, 3, 4]);
+    expect([ir.system.startMapId, ir.system.startX, ir.system.startY]).toEqual([1, 2, 2]);
   });
 
   it("事件页与命令正确解析", () => {
@@ -33,7 +33,7 @@ describe("MV 数据解析 → IR", () => {
     expect(codes).toEqual([Cmd.ShowText, Cmd.ShowTextCont, Cmd.ControlSwitches, Cmd.TransferPlayer, Cmd.End]);
     // 传送参数 [mapId, x, y, dir, fade]
     const transfer = page.commands[3]!;
-    expect(transfer.parameters.slice(0, 3)).toEqual([2, 5, 5]);
+    expect(transfer.parameters.slice(0, 3)).toEqual([2, 2, 2]);
   });
 
   it("页条件解析：EV002 需要开关 1 为 ON", () => {

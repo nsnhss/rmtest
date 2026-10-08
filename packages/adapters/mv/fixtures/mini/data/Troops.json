@@ -1,0 +1,12 @@
+[
+  null,
+  {
+    "id": 1,
+    "name": "哥布林×2",
+    "members": [
+      { "enemyId": 1, "x": 100, "y": 200, "hidden": false },
+      { "enemyId": 2, "x": 300, "y": 200, "hidden": false }
+    ],
+    "pages": []
+  }
+]

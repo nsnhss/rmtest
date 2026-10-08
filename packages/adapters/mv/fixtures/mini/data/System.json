@@ -5,6 +5,13 @@
   "startMapId": 1,
   "startX": 3,
   "startY": 4,
+  "title1Name": "Title1",
+  "title2Name": "",
+  "titleBgm": { "name": "Theme1", "pan": 0, "pitch": 100, "volume": 90 },
+  "gameoverMe": { "name": "Gameover1", "pan": 0, "pitch": 100, "volume": 90 },
+  "boat": { "characterName": "Vehicle", "characterIndex": 0, "bgm": { "name": "", "pan": 0, "pitch": 100, "volume": 90 }, "startMapId": 0, "startX": 0, "startY": 0 },
+  "ship": { "characterName": "", "characterIndex": 0, "bgm": { "name": "", "pan": 0, "pitch": 100, "volume": 90 }, "startMapId": 0, "startX": 0, "startY": 0 },
+  "airship": { "characterName": "", "characterIndex": 0, "bgm": { "name": "", "pan": 0, "pitch": 100, "volume": 90 }, "startMapId": 0, "startX": 0, "startY": 0 },
   "encryptionKey": "d41d8cd98f00b204e9800998ecf8427e",
   "versionId": 1
 }

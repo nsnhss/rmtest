@@ -50,6 +50,28 @@ describe("MV 数据解析 → IR", () => {
     expect(ir.commonEvents[0]!.switchId).toBe(1);
     expect(ir.actors[0]!.faceName).toBe("Actor1");
   });
+
+  it("数据库与资源域解析", () => {
+    expect(ir.tilesets[0]!.imageNames.slice(0, 3)).toEqual(["", "Outside_A1", "Outside_A2"]);
+    expect(ir.items.map((i) => i.iconIndex)).toEqual([5, 300]);
+    expect(ir.weapons).toHaveLength(1);
+    expect(ir.troops[0]!.enemyIds).toEqual([1, 2]);
+    expect(ir.enemies[0]!.battlerName).toBe("Goblin");
+    expect(ir.animations[0]!.image1Name).toBe("Fire");
+    expect(ir.classes[0]!.name).toBe("战士");
+  });
+
+  it("系统扩展字段解析", () => {
+    expect(ir.system.title1Name).toBe("Title1");
+    expect(ir.system.sounds.bgm.name).toBe("Theme1");
+    expect(ir.system.vehicles.boat.characterName).toBe("Vehicle");
+  });
+
+  it("地图扩展字段解析", () => {
+    const map = ir.maps[0]!;
+    expect(map.tilesetId).toBe(1);
+    expect(map.encounterTroopIds).toEqual([1]);
+  });
 });
 
 describe("容错：坏数据不崩", () => {

@@ -1,0 +1,11 @@
+[
+  null,
+  {
+    "id": 1,
+    "mode": 1,
+    "name": "野外",
+    "tilesetNames": ["", "Outside_A1", "Outside_A2", "Outside_A3", "Outside_A4", "Outside_A5", "Outside_B", "Outside_C", "Outside_D", "Outside_E"],
+    "flags": [],
+    "note": ""
+  }
+]

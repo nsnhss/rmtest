@@ -7,7 +7,9 @@
   "bgs": { "name": "", "pan": 0, "pitch": 100, "volume": 90 },
   "disableDashing": false,
   "displayName": "",
-  "encounterList": [],
+  "encounterList": [
+    { "troopId": 1, "weight": 5, "regionSet": [] }
+  ],
   "encounterStep": 30,
   "height": 4,
   "note": "",

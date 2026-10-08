@@ -17,6 +17,15 @@ export interface IRDocument {
   maps: IRMap[];
   actors: IRActor[];
   commonEvents: IRCommonEvent[];
+  tilesets: IRTileset[];
+  items: IRItem[];
+  weapons: IRItem[];
+  armors: IRItem[];
+  skills: IRSkill[];
+  troops: IRTroop[];
+  enemies: IREnemy[];
+  animations: IRAnimation[];
+  classes: IRClass[];
 }
 
 export interface IRSystem {
@@ -28,6 +37,12 @@ export interface IRSystem {
   startMapId: number;
   startX: number;
   startY: number;
+  title1Name: string;
+  title2Name: string;
+  /** 默认系统音频（名称在内部对象里） */
+  sounds: Record<"bgm" | "bgs" | "me" | "se", { name: string }>;
+  /** 载具行走图 */
+  vehicles: Record<"boat" | "ship" | "airship", { characterName: string }>;
 }
 
 export interface IRMap {
@@ -38,6 +53,13 @@ export interface IRMap {
   tilesetId: number;
   /** 瓦片数据 width*height 整数 */
   data: number[];
+  parallaxName: string;
+  bgmName: string;
+  bgsName: string;
+  battleback1Name: string;
+  battleback2Name: string;
+  /** 遇敌队伍引用 */
+  encounterTroopIds: number[];
   events: IREvent[];
 }
 
@@ -72,12 +94,27 @@ export const Cmd = {
   End: 0,
   ShowText: 101,
   ShowTextCont: 401,
+  ConditionalBranch: 111,
+  CallCommonEvent: 117,
   ControlSwitches: 121,
   ControlVariables: 122,
+  ChangeItems: 126,
+  ChangeWeapons: 127,
+  ChangeArmors: 128,
+  ChangePartyMember: 129,
+  RecoverAll: 313,
   TransferPlayer: 201,
-  CallCommonEvent: 117,
+  SetMoveRoute: 205,
   ShowPicture: 231,
   ErasePicture: 235,
+  ChangeBgm: 241,
+  ChangeBgs: 245,
+  ChangeMe: 249,
+  ChangeSe: 250,
+  PlayMovie: 261,
+  BattleProcessing: 301,
+  ShopProcessing: 302,
+  ChangeActorImages: 322,
 } as const;
 
 export interface IRCommand {
@@ -101,4 +138,47 @@ export interface IRCommonEvent {
   trigger: number;
   switchId: number | null;
   commands: IRCommand[];
+}
+
+export interface IRTileset {
+  id: number;
+  name: string;
+  /** A1-A5, B-E 九张图名 */
+  imageNames: string[];
+}
+
+export interface IRItem {
+  id: number;
+  name: string;
+  iconIndex: number;
+}
+
+export interface IRSkill {
+  id: number;
+  name: string;
+  iconIndex: number;
+}
+
+export interface IRTroop {
+  id: number;
+  name: string;
+  enemyIds: number[];
+}
+
+export interface IREnemy {
+  id: number;
+  name: string;
+  battlerName: string;
+}
+
+export interface IRAnimation {
+  id: number;
+  name: string;
+  image1Name: string;
+  image2Name: string;
+}
+
+export interface IRClass {
+  id: number;
+  name: string;
 }

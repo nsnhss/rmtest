@@ -9,10 +9,11 @@
     "node": ">=24"
   },
   "scripts": {
-    "typecheck": "tsc -b",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "spike:mv": "tsx packages/adapters/mv/spike/parse.ts",
-    "spike:runtime": "tsx packages/runtime/spike/run.ts"
+    "spike:runtime": "tsx packages/runtime/spike/run.ts",
+    "scan": "tsx packages/cli/src/main.ts"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",

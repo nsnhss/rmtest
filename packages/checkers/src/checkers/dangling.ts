@@ -2,8 +2,14 @@
  * 悬空引用检查 —— 检查器 v1 的第一主力。
  * 资产缺失 / 数据 ID 越界或不存在；大小写不一致单独降级为警告。
  */
-import { type CheckerPlugin, type GameUniverse, type RefCategory, type RefGraph, type ReportSection } from "@rmtest/core";
-import { formatLocation } from "../format.ts";
+import {
+  type CheckerPlugin,
+  formatLocation,
+  type GameUniverse,
+  type RefCategory,
+  type RefGraph,
+  type ReportSection,
+} from "@rmtest/core";
 
 const CATEGORY_LABEL: Record<string, string> = {
   map: "地图",

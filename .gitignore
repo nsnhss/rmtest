@@ -12,6 +12,10 @@ release/
 coverage/
 .nyc_output/
 
+# 扫描生成的报告与演示工程
+rmtest-report.html
+demo-project/
+
 # 环境与密钥
 .env
 .env.local

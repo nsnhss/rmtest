@@ -201,7 +201,28 @@ importers:
         specifier: workspace:*
         version: link:../adapters/mv
 
+  packages/cli:
+    dependencies:
+      '@rmtest/adapter-mv':
+        specifier: workspace:*
+        version: link:../adapters/mv
+      '@rmtest/checkers':
+        specifier: workspace:*
+        version: link:../checkers
+      '@rmtest/core':
+        specifier: workspace:*
+        version: link:../core
+      '@rmtest/report':
+        specifier: workspace:*
+        version: link:../report
+
   packages/core: {}
+
+  packages/report:
+    dependencies:
+      '@rmtest/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/runtime:
     dependencies:

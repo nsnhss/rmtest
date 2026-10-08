@@ -17,8 +17,8 @@ export interface RealGameSession extends CdpSession {
 
 export interface RealSnapshot {
   ready: boolean;
-  /** 索引 = 开关 ID（0 槽为 null） */
-  switches: Array<boolean | null>;
+  /** 索引 = 开关 ID（0 槽为 false） */
+  switches: boolean[];
   /** 索引 = 变量 ID */
   variables: Array<number | null>;
   transferring: boolean;
@@ -90,19 +90,31 @@ const BRIDGE = `(() => {
     snapshot() {
       return {
         ready: typeof DataManager !== "undefined" && DataManager.isDatabaseLoaded(),
-        switches: $gameSwitches._data,
-        variables: $gameVariables._data,
+        switches: (() => {
+          const data = $gameSwitches._data || [];
+          const count = $dataSystem ? $dataSystem.switches.length : 0;
+          const out = [];
+          for (let i = 0; i < count; i++) out.push(!!data[i]);
+          return out;
+        })(),
+        variables: (() => {
+          const data = $gameVariables._data || [];
+          const count = $dataSystem ? $dataSystem.variables.length : 0;
+          const out = [];
+          for (let i = 0; i < count; i++) out.push(data[i] ?? 0);
+          return out;
+        })(),
         transferring: $gamePlayer.isTransferring(),
         transferTarget: $gamePlayer.isTransferring()
           ? { mapId: $gamePlayer._newMapId, x: $gamePlayer._newX, y: $gamePlayer._newY }
           : null,
-        mapId: typeof $gameMap !== "undefined" ? $gameMap._mapId : 0,
+        mapId: $gameMap ? $gameMap._mapId : 0,
         playerX: $gamePlayer._x,
         playerY: $gamePlayer._y,
-        eventRunning: typeof $gameMap !== "undefined" ? $gameMap.isEventRunning() : false,
+        eventRunning: $gameMap ? $gameMap.isEventRunning() : false,
         messageBusy: $gameMessage.isBusy(),
-        dataMapWidth: typeof $dataMap !== "undefined" ? $dataMap.width : 0,
-        dataMapHeight: typeof $dataMap !== "undefined" ? $dataMap.height : 0,
+        dataMapWidth: $dataMap ? $dataMap.width : 0,
+        dataMapHeight: $dataMap ? $dataMap.height : 0,
       };
     },
   };

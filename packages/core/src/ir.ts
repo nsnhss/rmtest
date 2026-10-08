@@ -148,6 +148,8 @@ export interface IRTileset {
   name: string;
   /** A1-A5, B-E 九张图名 */
   imageNames: string[];
+  /** 每瓦片 4 方向通行性位（0x1下 0x2左 0x4右 0x8上；全 1 = 不可走） */
+  flags: number[];
 }
 
 export interface IRItem {

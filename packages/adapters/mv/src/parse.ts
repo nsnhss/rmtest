@@ -108,6 +108,7 @@ export function parseData(files: Record<string, unknown>, engine: "mv" | "mz" = 
         id: Number(t["id"]),
         name: String(t["name"] ?? ""),
         imageNames: Array.isArray(t["tilesetNames"]) ? (t["tilesetNames"] as unknown[]).map((n) => String(n ?? "")) : [],
+        flags: Array.isArray(t["flags"]) ? (t["flags"] as unknown[]).map(Number) : [],
       })) satisfies IRTileset[],
       items: parseIdList(files["Items.json"], parseItem) satisfies IRItem[],
       weapons: parseIdList(files["Weapons.json"], parseItem) satisfies IRItem[],

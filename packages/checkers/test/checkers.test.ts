@@ -167,6 +167,103 @@ describe("checkers v1", () => {
     }
   });
 
+  it("传送越界 → transfer-softlock 高置信", () => {
+    const p = buildProject(fullAssets());
+    try {
+      p.writeJson("Map001.json", (d) => {
+        const ev1 = (d["events"] as Array<Record<string, unknown> | null>)[1]!;
+        const page = (ev1["pages"] as Array<Record<string, unknown>>)[0]!;
+        const list = page["list"] as Array<Record<string, unknown>>;
+        const transfer = list.find((c) => c["code"] === 201)!;
+        transfer["parameters"] = [2, 9, 9, 0, 0];
+      });
+      const sections = run(p.loaded()).sections;
+      const hit = sections.filter((s) => s.type === "transfer-softlock" && s.message.includes("越界"));
+      expect(hit).toHaveLength(1);
+      expect(hit[0]).toMatchObject({ severity: "error", confidence: "high" });
+    } finally {
+      p.destroy();
+    }
+  });
+
+  it("传送到不可走格子 → 卡墙软锁", () => {
+    const p = buildProject(fullAssets());
+    try {
+      p.writeJson("Tilesets.json", (d) => {
+        const arr = d as unknown as Array<Record<string, unknown> | null>;
+        arr[1]!["flags"] = [0, 0xf];
+      });
+      p.writeJson("Map002.json", (d) => {
+        const data = d["data"] as unknown[];
+        data[2 * 5 + 2] = 1; // (2,2) 换成阻挡瓦片
+      });
+      const sections = run(p.loaded()).sections;
+      const hit = sections.filter((s) => s.type === "transfer-softlock" && s.message.includes("不可走"));
+      expect(hit).toHaveLength(1);
+      expect(hit[0]!.message).toContain("(2, 2)");
+    } finally {
+      p.destroy();
+    }
+  });
+
+  it("传送点四周全阻挡 → 无法离开警告", () => {
+    const p = buildProject(fullAssets());
+    try {
+      p.writeJson("Tilesets.json", (d) => {
+        const arr = d as unknown as Array<Record<string, unknown> | null>;
+        arr[1]!["flags"] = [0, 0xf];
+      });
+      p.writeJson("Map002.json", (d) => {
+        const data = d["data"] as unknown[];
+        // (2,2) 保持可走，四周 (1,2)(3,2)(2,1)(2,3) 全阻挡
+        data[2 * 5 + 2] = 0;
+        data[1 * 5 + 2] = 1;
+        data[3 * 5 + 2] = 1;
+        data[2 * 5 + 1] = 1;
+        data[2 * 5 + 3] = 1;
+      });
+      const sections = run(p.loaded()).sections;
+      const hit = sections.filter((s) => s.type === "transfer-softlock" && s.message.includes("无法离开"));
+      expect(hit).toHaveLength(1);
+      expect(hit[0]).toMatchObject({ severity: "warning", confidence: "medium" });
+    } finally {
+      p.destroy();
+    }
+  });
+
+  it("开局点越界 → 系统级软锁检查", () => {
+    const p = buildProject(fullAssets());
+    try {
+      p.writeJson("System.json", (d) => {
+        d["startX"] = 99;
+      });
+      const sections = run(p.loaded()).sections;
+      const hit = sections.filter((s) => s.type === "transfer-softlock" && s.message.includes("开局"));
+      expect(hit).toHaveLength(1);
+    } finally {
+      p.destroy();
+    }
+  });
+
+  it("传送被移除 → 地图不可达提示", () => {
+    const p = buildProject(fullAssets());
+    try {
+      p.writeJson("Map001.json", (d) => {
+        const ev1 = (d["events"] as Array<Record<string, unknown> | null>)[1]!;
+        const page = (ev1["pages"] as Array<Record<string, unknown>>)[0]!;
+        const list = page["list"] as Array<Record<string, unknown>>;
+        const idx = list.findIndex((c) => c["code"] === 201);
+        list.splice(idx, 1);
+      });
+      const sections = run(p.loaded()).sections;
+      const hit = sections.filter((s) => s.type === "unreachable-map" && s.message.includes("地图 2"));
+      expect(hit).toHaveLength(1);
+      expect(hit[0]).toMatchObject({ severity: "info", confidence: "low" });
+    } finally {
+      p.destroy();
+    }
+  });
+
   it("插件抛异常 → 记录错误，其余检查器照跑（内核隔离）", () => {
     const p = buildProject(fullAssets());
     try {

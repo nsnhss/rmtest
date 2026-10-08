@@ -3,7 +3,7 @@
  * 纯静态 + AI，不需要游戏运行。终审是人：提案列表 diff 给人看，--apply 才写回。
  */
 import { readFileSync } from "node:fs";
-import { loadProject } from "@rmtest/adapter-mv";
+import { loadProjectAny } from "./loader.ts";
 import { buildGameSurface, repairScenario, type ChatProvider } from "@rmtest/ai";
 import { ScenarioSchema, type Scenario } from "@rmtest/dsl";
 import { classifyScenario } from "@rmtest/freshness";
@@ -27,7 +27,7 @@ export async function repairCli(
   rawCorpus: unknown[],
   provider: ChatProvider,
 ): Promise<RepairOutcome> {
-  const loaded = loadProject(projectDir);
+  const loaded = loadProjectAny(projectDir).project;
   const surface = buildGameSurface(loaded.ir);
 
   const corpus: Scenario[] = [];

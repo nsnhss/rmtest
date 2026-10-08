@@ -3,7 +3,7 @@
  * 对部署产物（含加密）跑扫描，聚焦部署特有风险：
  * 大小写不一致（Linux/移动端必炸）、加密资源解析、字体缺失。
  */
-import { loadProject } from "@rmtest/adapter-mv";
+import { loadProjectAny } from "./loader.ts";
 import { checkers } from "@rmtest/checkers";
 import { buildLifecycle, buildRefGraph, runCheckers } from "@rmtest/core";
 
@@ -16,7 +16,7 @@ export interface DeployReport {
 }
 
 export function deployReport(projectDir: string): DeployReport {
-  const loaded = loadProject(projectDir);
+  const loaded = loadProjectAny(projectDir).project;
   const facts = {
     refgraph: buildRefGraph(loaded.ir),
     lifecycle: buildLifecycle(loaded.ir),

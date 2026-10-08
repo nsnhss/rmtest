@@ -4,6 +4,7 @@ export * from "./plugin.ts";
 export * from "./walk.ts";
 export * from "./guards.ts";
 export * from "./universe.ts";
+export * from "./png.ts";
 export * from "./facts/refgraph.ts";
 export * from "./facts/lifecycle.ts";
 export * from "./facts/reachables.ts";

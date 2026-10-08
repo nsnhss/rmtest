@@ -11,7 +11,7 @@ export const IR_SCHEMA_VERSION = 1;
 
 export interface IRDocument {
   schemaVersion: number;
-  engine: "mv" | "mz";
+  engine: "mv" | "mz" | "rgss";
   engineVersion?: string;
   system: IRSystem;
   maps: IRMap[];

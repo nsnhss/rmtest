@@ -4,7 +4,7 @@
  * 结果写入项目库（results 表），历史可查。
  */
 import path from "node:path";
-import { loadProject } from "@rmtest/adapter-mv";
+import { loadProjectAny } from "./loader.ts";
 import { ScenarioSchema } from "@rmtest/dsl";
 import { maintenanceReport } from "@rmtest/freshness";
 import {
@@ -30,7 +30,8 @@ export interface RegressSummary {
 }
 
 export async function regressCli(projectDir: string): Promise<RegressSummary> {
-  const loaded = loadProject(projectDir);
+  const { engine, project: loaded } = loadProjectAny(projectDir);
+  if (engine === "rgss") throw new Error("RGSS 动态执行未支持");
   const store = new ProjectStore(path.join(projectDir, "rmtest.db"));
   const stored = store.listScenarios();
 

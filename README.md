@@ -15,6 +15,7 @@
 | 时效性引擎 | fresh/broken/stale 三分类 + 内容哈希机械重链（地图 + 开关个体粒度） |
 | AI 层 | `aigen` 自然语言生成场景（校验闸门循环）、`repair` 过时场景修复提案、`explain` 失败轨迹翻译——本地 Ollama，判定始终在确定性引擎 |
 | 部署验收 | `deploy` 命令：加密产物解析 + 大小写专项 + 字体检查 |
+| 多引擎 | MV/MZ 全能力；**RGSS（VX Ace/XP/VX）静态分析**——Ruby Marshal 解析 + 自动识别，scan/deploy/maintain 等静态命令直接可用 |
 | 插件生态 | 用户自写 checker 文件级分发，`loadCheckersFromDir` 动态加载，坏插件隔离 |
 | 桌面应用 | `pnpm desktop`：扫描/维护/内容/AI 生成/场景库/运行中心六视图 |
 

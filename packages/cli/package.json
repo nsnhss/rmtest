@@ -9,6 +9,7 @@
   "dependencies": {
     "@rmtest/core": "workspace:*",
     "@rmtest/adapter-mv": "workspace:*",
+    "@rmtest/adapter-rgss": "workspace:*",
     "@rmtest/checkers": "workspace:*",
     "@rmtest/report": "workspace:*",
     "@rmtest/dsl": "workspace:*",

@@ -3,7 +3,7 @@
  * 沙漏入口：NL + 游戏表面 → AI → 校验闸门 → 场景 JSON（绝不执行）。
  * 输出带 feedback 记录，供观察模型被打回了几次。
  */
-import { loadProject } from "@rmtest/adapter-mv";
+import { loadProjectAny } from "./loader.ts";
 import { buildGameSurface, generateScenario, OllamaProvider, type ChatProvider } from "@rmtest/ai";
 
 export interface AigenOutcome {
@@ -19,7 +19,7 @@ export async function aigen(
   provider: ChatProvider,
   opts: { maxAttempts?: number } = {},
 ): Promise<AigenOutcome> {
-  const loaded = loadProject(projectDir);
+  const loaded = loadProjectAny(projectDir).project;
   const surface = buildGameSurface(loaded.ir);
   const result = await generateScenario(nl, surface, loaded.ir, loaded.universe, provider, opts);
   return {

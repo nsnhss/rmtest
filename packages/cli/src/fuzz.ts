@@ -3,6 +3,7 @@
  * 输出：步数、新颖状态数、崩溃清单。
  */
 import path from "node:path";
+import { detectEngine } from "./loader.ts";
 import {
   closeRealGame,
   fuzzRealGame,
@@ -19,6 +20,7 @@ export interface FuzzCliOptions {
 }
 
 export async function fuzzCli(projectDir: string, opts: FuzzCliOptions = {}): Promise<RealFuzzResult> {
+  if (detectEngine(projectDir) === "rgss") throw new Error("RGSS 动态执行未支持");
   const electronExe = path.resolve(import.meta.dirname, "../../../node_modules/electron/dist/electron.exe");
   const session = await launchRealGame(projectDir, { electronPath: electronExe });
   try {

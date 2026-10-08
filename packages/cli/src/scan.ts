@@ -5,11 +5,11 @@
  * 有变更列出受影响文件。基线存项目库 meta（prev_file_hashes）。
  */
 import path from "node:path";
-import { loadProject } from "@rmtest/adapter-mv";
 import { checkers } from "@rmtest/checkers";
 import { buildLifecycle, buildRefGraph, runCheckers } from "@rmtest/core";
 import { renderReport } from "@rmtest/report";
 import { ProjectStore } from "@rmtest/store";
+import { loadProjectAny, type AnyLoadedProject } from "./loader.ts";
 
 export interface ScanOptions {
   incremental?: boolean;
@@ -30,7 +30,7 @@ export interface ScanSummary {
 const PREV_HASHES_KEY = "prev_file_hashes";
 
 export function scan(projectDir: string, opts: ScanOptions = {}): ScanSummary {
-  const loaded = loadProject(projectDir);
+  const loaded = loadProjectAny(projectDir).project;
 
   if (opts.incremental) {
     const store = new ProjectStore(path.join(projectDir, "rmtest.db"));
@@ -68,7 +68,7 @@ export function scan(projectDir: string, opts: ScanOptions = {}): ScanSummary {
   return { ...runFull(loaded), changedFiles: null, unchanged: false };
 }
 
-function runFull(loaded: ReturnType<typeof loadProject>): Omit<ScanSummary, "changedFiles" | "unchanged"> {
+function runFull(loaded: AnyLoadedProject): Omit<ScanSummary, "changedFiles" | "unchanged"> {
   const facts = {
     refgraph: buildRefGraph(loaded.ir),
     lifecycle: buildLifecycle(loaded.ir),

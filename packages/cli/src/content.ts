@@ -3,7 +3,7 @@
  * 对比当前可达事件页全集与基线，报告新增/删除内容。
  * 新增可达内容 = 尚未有任何测试覆盖的候选，进补测队列。
  */
-import { loadProject } from "@rmtest/adapter-mv";
+import { loadProjectAny } from "./loader.ts";
 import { diffContentKeys, reachablePageKeys } from "@rmtest/core";
 
 export interface ContentReport {
@@ -16,7 +16,7 @@ export interface ContentReport {
 }
 
 export function contentReport(projectDir: string, baselineKeys?: readonly string[]): ContentReport {
-  const loaded = loadProject(projectDir);
+  const loaded = loadProjectAny(projectDir).project;
   const keys = reachablePageKeys(loaded.ir);
   if (!baselineKeys) return { keys, total: keys.length, hasBaseline: false, added: [], removed: [] };
   const diff = diffContentKeys(baselineKeys, keys);

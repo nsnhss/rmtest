@@ -4,6 +4,7 @@
  * check:   当前画面 vs 基线像素 diff；diffRatio 超阈值即失败
  */
 import path from "node:path";
+import { detectEngine } from "./loader.ts";
 import {
   closeRealGame,
   compareGolden,
@@ -31,6 +32,7 @@ export async function goldenCli(
   mode: "approve" | "check",
   threshold = 0.05,
 ): Promise<GoldenCheckResult> {
+  if (detectEngine(projectDir) === "rgss") throw new Error("RGSS 动态执行未支持");
   const electronExe = path.resolve(import.meta.dirname, "../../../node_modules/electron/dist/electron.exe");
   const session = await launchRealGame(projectDir, { electronPath: electronExe });
   try {

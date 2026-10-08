@@ -2,7 +2,7 @@
  * CLI maintain —— 测试语料维护报告。
  * 对真实工程纯静态可用：三分类（fresh/broken/stale）+ broken 引用机械重链。
  */
-import { loadProject } from "@rmtest/adapter-mv";
+import { loadProjectAny } from "./loader.ts";
 import { ScenarioSchema, type Scenario } from "@rmtest/dsl";
 import { maintenanceReport, relinkScenario, type MaintenanceReport } from "@rmtest/freshness";
 
@@ -19,7 +19,7 @@ export interface MaintainOutcome {
 }
 
 export function maintain(projectDir: string, rawCorpus: unknown[]): MaintainOutcome {
-  const loaded = loadProject(projectDir);
+  const loaded = loadProjectAny(projectDir).project;
   const corpus: Scenario[] = [];
   const badEntries: string[] = [];
 

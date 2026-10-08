@@ -5,7 +5,7 @@
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { loadProject } from "@rmtest/adapter-mv";
+import { loadProjectAny } from "./loader.ts";
 import { ScenarioSchema } from "@rmtest/dsl";
 import { classifyScenario } from "@rmtest/freshness";
 import { ProjectStore } from "@rmtest/store";
@@ -37,7 +37,7 @@ export function corpusAdd(projectDir: string, scenarioPath: string): CorpusAddRe
 }
 
 export function corpusList(projectDir: string): CorpusListEntry[] {
-  const loaded = loadProject(projectDir);
+  const loaded = loadProjectAny(projectDir).project;
   const store = new ProjectStore(dbPath(projectDir));
   try {
     return store.listScenarios().map((s) => {

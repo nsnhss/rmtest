@@ -10,6 +10,8 @@
     "@rmtest/core": "workspace:*",
     "@rmtest/adapter-mv": "workspace:*",
     "@rmtest/checkers": "workspace:*",
-    "@rmtest/report": "workspace:*"
+    "@rmtest/report": "workspace:*",
+    "@rmtest/dsl": "workspace:*",
+    "@rmtest/freshness": "workspace:*"
   }
 }

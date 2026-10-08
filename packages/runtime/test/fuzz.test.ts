@@ -21,9 +21,11 @@ describe("fuzz 探索器", () => {
   });
 
   it("同种子 → 步数与新颖状态数可复现", async () => {
-    const opts = { timeBudgetMs: 1000, maxSteps: 300, seed: 7 };
+    // 时间预算给足（60s），步数封顶 300 成为唯一终止条件 → 与墙钟无关，可复现
+    const opts = { timeBudgetMs: 60_000, maxSteps: 300, seed: 7 };
     const r1 = await fuzzGame(fx.page, opts);
     const r2 = await fuzzGame(fx.page, opts);
+    expect(r1.steps).toBe(300);
     expect(r1.steps).toBe(r2.steps);
     expect(r1.novelStates).toBe(r2.novelStates);
     expect(r1.steps).toBeGreaterThan(0);

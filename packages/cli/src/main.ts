@@ -4,12 +4,18 @@
  *   pnpm maintain <工程目录> <语料.json>          — 语料维护报告（三分类 + 重链）
  *   pnpm content <工程目录> [基线.json] [--save]  — 新内容检测（可达事件页 diff）
  *   pnpm aigen <工程目录> "自然语言需求"           — AI 生成测试场景（需 Ollama + 聊天模型）
+ *   pnpm run <工程目录> <场景.json>               — 真实引擎上执行场景
+ *   pnpm fuzz <工程目录> [--time ms] [--steps n] [--seed n] — 真实引擎随机探索
+ *   pnpm golden <工程目录> <approve|check> <标签> — 截图基线审批/回归对比
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { aigen, defaultProvider } from "./aigen.ts";
 import { contentReport } from "./content.ts";
+import { fuzzCli } from "./fuzz.ts";
+import { goldenCli } from "./golden.ts";
 import { maintain } from "./maintain.ts";
+import { runScenarioCli } from "./run.ts";
 import { scan } from "./scan.ts";
 
 const cmd = process.argv[2] ?? "scan";
@@ -100,6 +106,65 @@ if (cmd === "maintain") {
     console.error(`（${outcome.attempts} 次尝试通过校验闸门）`);
   } catch (err) {
     console.error(`AI 调用失败（Ollama 未运行或无聊天模型？）: ${err instanceof Error ? err.message : String(err)}`);
+    process.exit(2);
+  }
+} else if (cmd === "run") {
+  const projectDir = path.resolve(process.argv[3] ?? ".");
+  const scenarioPath = process.argv[4] ? path.resolve(process.argv[4]) : "";
+  if (!scenarioPath) {
+    console.error("用法: pnpm run <工程目录> <场景.json>");
+    process.exit(2);
+  }
+  try {
+    const result = await runScenarioCli(projectDir, scenarioPath);
+    for (const step of result.stepResults) {
+      console.log(`  [${step.passed ? "✓" : "✗"}] 第 ${step.index + 1} 步 ${step.type}${step.message ? ` — ${step.message}` : ""}`);
+    }
+    console.log(result.passed ? "场景通过" : "场景失败");
+    process.exitCode = result.passed ? 0 : 1;
+  } catch (err) {
+    console.error(`执行失败: ${err instanceof Error ? err.message : String(err)}`);
+    process.exit(2);
+  }
+} else if (cmd === "fuzz") {
+  const projectDir = path.resolve(process.argv[3] ?? ".");
+  const argValue = (name: string): number | undefined => {
+    const idx = process.argv.indexOf(name);
+    return idx >= 0 && process.argv[idx + 1] ? Number(process.argv[idx + 1]) : undefined;
+  };
+  try {
+    const result = await fuzzCli(projectDir, {
+      maxSteps: argValue("--steps"),
+      timeBudgetMs: argValue("--time"),
+      seed: argValue("--seed"),
+    });
+    console.log(`步数 ${result.steps} · 新颖状态 ${result.novelStates} · 崩溃 ${result.crashes.length}`);
+    for (const c of result.crashes) console.log(`  崩溃: ${c}`);
+    process.exitCode = result.crashes.length > 0 ? 1 : 0;
+  } catch (err) {
+    console.error(`fuzz 失败: ${err instanceof Error ? err.message : String(err)}`);
+    process.exit(2);
+  }
+} else if (cmd === "golden") {
+  const projectDir = path.resolve(process.argv[3] ?? ".");
+  const mode = process.argv[4] === "approve" ? "approve" : process.argv[4] === "check" ? "check" : null;
+  const tag = process.argv[5] ?? "";
+  if (!mode || !tag) {
+    console.error("用法: pnpm golden <工程目录> <approve|check> <标签> [--threshold 0.05]");
+    process.exit(2);
+  }
+  const thresholdIdx = process.argv.indexOf("--threshold");
+  const threshold = thresholdIdx >= 0 && process.argv[thresholdIdx + 1] ? Number(process.argv[thresholdIdx + 1]) : 0.05;
+  try {
+    const result = await goldenCli(projectDir, tag, mode, threshold);
+    if (mode === "approve") {
+      console.log(`基线 ${tag} 已批准${result.baselineExisted ? "（覆盖旧基线）" : ""}`);
+    } else {
+      console.log(`基线 ${tag} diffRatio=${result.diffRatio.toFixed(4)} ${result.comparable ? "" : "（尺寸不匹配）"}`);
+      process.exitCode = result.comparable && result.diffRatio > threshold ? 1 : 0;
+    }
+  } catch (err) {
+    console.error(`golden 失败: ${err instanceof Error ? err.message : String(err)}`);
     process.exit(2);
   }
 } else {

@@ -13,6 +13,8 @@
     "@rmtest/report": "workspace:*",
     "@rmtest/dsl": "workspace:*",
     "@rmtest/freshness": "workspace:*",
-    "@rmtest/ai": "workspace:*"
+    "@rmtest/ai": "workspace:*",
+    "@rmtest/runtime": "workspace:*",
+    "@rmtest/store": "workspace:*"
   }
 }

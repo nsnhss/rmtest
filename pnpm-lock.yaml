@@ -239,6 +239,12 @@ importers:
       '@rmtest/report':
         specifier: workspace:*
         version: link:../report
+      '@rmtest/runtime':
+        specifier: workspace:*
+        version: link:../runtime
+      '@rmtest/store':
+        specifier: workspace:*
+        version: link:../store
 
   packages/core: {}
 

@@ -30,8 +30,8 @@ describe.skipIf(!PROJECT)("真实 MV 引擎验证", () => {
       { code: 0, indent: 0, parameters: [] },
     ]);
     expect(result.status).toBe("finished");
-    expect(result.snapshot.switches[4]).toBe(1); // 开关 5
-    expect(result.snapshot.variables[0]).toBe(5); // 变量 1
+    expect(result.snapshot.switches[5]).toBe(true); // 开关 5
+    expect(result.snapshot.variables[1]).toBe(5); // 变量 1
   });
 
   it("真实引擎：Transfer Player 写入传送目标并进入等待", async () => {
@@ -50,6 +50,6 @@ describe.skipIf(!PROJECT)("真实 MV 引擎验证", () => {
       return b.snapshot();
     })) as { ready: boolean; switches: number[] };
     expect(snapshot.ready).toBe(true);
-    expect(snapshot.switches[0]).toBe(0); // 开关 1 初始 OFF
+    expect(snapshot.switches[1]).toBe(false); // 开关 1 初始 OFF
   });
 });

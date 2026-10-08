@@ -107,7 +107,7 @@ describe.skipIf(!PROJECT)("真实引擎场景级", () => {
     await pressOk(session.page);
     // 消息确认后事件走完，开关 5 置位
     const done = await waitForSnapshot(session.page, (s) => !s.eventRunning && !s.messageBusy, 15_000);
-    expect(done.switches[4]).toBe(1);
+    expect(done.switches[5]).toBe(true);
   });
 
   it("存档往返：保存 → 改状态 → 读档恢复", { timeout: 90_000 }, async () => {
@@ -121,7 +121,7 @@ describe.skipIf(!PROJECT)("真实引擎场景级", () => {
       { code: 0, indent: 0, parameters: [] },
     ]);
     const off = await snapshotReal(session.page);
-    expect(off.switches[4]).toBe(0);
+    expect(off.switches[5]).toBe(false);
 
     // 读档 → 回地图场景 → 开关 5 恢复 ON
     const loaded = await loadGame(session.page, 1);
@@ -129,7 +129,7 @@ describe.skipIf(!PROJECT)("真实引擎场景级", () => {
     const entered = await enterMapScene(session.page);
     expect(entered).toBe(true);
     const restored = await waitForSnapshot(session.page, (s) => !s.transferring, 15_000);
-    expect(restored.switches[4]).toBe(1);
+    expect(restored.switches[5]).toBe(true);
     expect(restored.mapId).toBe(2);
   });
 });

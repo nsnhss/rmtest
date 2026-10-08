@@ -8,11 +8,11 @@
  * 是 System.json 整文件，无法定位个体，留待后续。
  */
 import type { IRDocument } from "@rmtest/core";
-import { switchHashes } from "@rmtest/core";
+import { switchHashes, variableHashes } from "@rmtest/core";
 import type { Scenario } from "@rmtest/dsl";
 
 export interface RelinkRecord {
-  kind: "map" | "switch";
+  kind: "map" | "switch" | "variable";
   fromId: number;
   toId: number;
 }
@@ -95,6 +95,34 @@ export function relinkScenario(
     step.switchId = toId;
     binding.id = toId;
     relinked.push({ kind: "switch", fromId, toId });
+  });
+
+  // 变量引用失效 → 按写入签名哈希唯一匹配迁移
+  const varSig = variableHashes(ir);
+  const variableCount = ir.system.variables.length;
+  next.steps.forEach((step, i) => {
+    if (step.type !== "assert_variable") return;
+    if (step.variableId < variableCount) return;
+
+    const binding = (next.bindings ?? []).find((b) => b.kind === "variable" && b.id === step.variableId);
+    if (!binding) {
+      unresolved.push(`第 ${i + 1} 步引用变量 ${step.variableId} 已不存在，且场景无绑定哈希可重链`);
+      return;
+    }
+
+    const candidates = [...varSig.entries()].filter(([id, hash]) => id !== step.variableId && hash === binding.hash);
+    if (candidates.length !== 1) {
+      unresolved.push(
+        `第 ${i + 1} 步引用变量 ${step.variableId} 已不存在；写入签名匹配到 ${candidates.length} 个候选，无法唯一重链`,
+      );
+      return;
+    }
+
+    const [toId] = candidates[0]!;
+    const fromId = step.variableId;
+    step.variableId = toId;
+    binding.id = toId;
+    relinked.push({ kind: "variable", fromId, toId });
   });
 
   return { scenario: next, relinked, unresolved };

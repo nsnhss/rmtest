@@ -38,6 +38,61 @@ function collectSwitchWrites(ir: IRDocument, switchId: number): string[] {
   return parts;
 }
 
+function collectVariableWrites(ir: IRDocument, variableId: number): string[] {
+  const parts: string[] = [];
+  const visit = (cmdCode: number, params: unknown[], loc: { mapId?: number; eventId?: number; pageIndex?: number; dataKey?: string; dataId?: number }) => {
+    if (cmdCode !== Cmd.ControlVariables) return;
+    const start = Number(params[0]);
+    const end = Number(params[1]);
+    if (variableId < start || variableId > end) return;
+    parts.push(
+      `${loc.mapId ?? 0}:${loc.eventId ?? 0}:${loc.pageIndex ?? -1}:${loc.dataKey ?? ""}:${loc.dataId ?? 0}:${JSON.stringify(params)}`,
+    );
+  };
+  for (const map of ir.maps) {
+    for (const ev of map.events) {
+      for (const page of ev.pages) {
+        walkCommands(page.commands, { mapId: map.id, eventId: ev.id, pageIndex: page.index }, (cmd, loc) =>
+          visit(cmd.code, cmd.parameters, loc),
+        );
+      }
+    }
+  }
+  for (const ce of ir.commonEvents) {
+    walkCommands(ce.commands, { dataKey: "commonEvent", dataId: ce.id }, (cmd, loc) =>
+      visit(cmd.code, cmd.parameters, loc),
+    );
+  }
+  return parts;
+}
+
+/** 单个变量的写入签名；从未被写入 → null */
+export function variableWriteSignature(ir: IRDocument, variableId: number): string | null {
+  const parts = collectVariableWrites(ir, variableId);
+  return parts.length > 0 ? sig(parts) : null;
+}
+
+/** 全部被写入变量的签名表 */
+export function variableHashes(ir: IRDocument): Map<number, string> {
+  const out = new Map<number, string>();
+  for (const map of ir.maps) {
+    for (const ev of map.events) {
+      for (const page of ev.pages) {
+        walkCommands(page.commands, {}, (cmd) => {
+          if (cmd.code !== Cmd.ControlVariables) return;
+          for (let id = Number(cmd.parameters[0]); id <= Number(cmd.parameters[1]); id++) {
+            if (!out.has(id)) {
+              const h = variableWriteSignature(ir, id);
+              if (h) out.set(id, h);
+            }
+          }
+        });
+      }
+    }
+  }
+  return out;
+}
+
 /** 单个开关的写入签名；从未被写入 → null */
 export function switchWriteSignature(ir: IRDocument, switchId: number): string | null {
   const parts = collectSwitchWrites(ir, switchId);

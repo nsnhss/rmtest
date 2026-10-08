@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Cmd, IR_SCHEMA_VERSION, switchWriteSignature, type IRDocument } from "@rmtest/core";
+import { Cmd, IR_SCHEMA_VERSION, switchWriteSignature, variableWriteSignature, type IRDocument } from "@rmtest/core";
 import type { Scenario } from "@rmtest/dsl";
 import { relinkScenario } from "../src/relink.ts";
 
@@ -122,6 +122,39 @@ describe("机械重链", () => {
     const out = relinkScenario(s, doc, new Map());
     expect(out.relinked).toEqual([{ kind: "switch", fromId: 9, toId: 1 }]);
     expect(out.scenario.steps[1]).toMatchObject({ type: "assert_switch", switchId: 1 });
+  });
+
+  it("变量引用失效 → 写入签名唯一命中 → 重链", () => {
+    const doc = irWithSwitchWriter();
+    // 换成变量写入者
+    doc.maps[0]!.events = [
+      {
+        id: 1,
+        name: "VarWriter",
+        x: 1,
+        y: 1,
+        pages: [
+          {
+            index: 0,
+            conditions: { selfSwitchCh: null, switch1Id: null, switch2Id: null, variableId: null, variableValue: 0, actorId: null, itemId: null },
+            trigger: 0,
+            commands: [{ code: Cmd.ControlVariables, indent: 0, parameters: [1, 1, 0, 0, 5] }],
+          },
+        ],
+      },
+    ];
+    const sig = variableWriteSignature(doc, 1)!;
+    const s: Scenario = {
+      id: "s3",
+      bindings: [{ kind: "variable", id: 9, hash: sig }],
+      steps: [
+        { type: "start_new_game" },
+        { type: "assert_variable", variableId: 9, value: 5 }, // 变量 9 不存在
+      ],
+    };
+    const out = relinkScenario(s, doc, new Map());
+    expect(out.relinked).toEqual([{ kind: "variable", fromId: 9, toId: 1 }]);
+    expect(out.scenario.steps[1]).toMatchObject({ type: "assert_variable", variableId: 1 });
   });
 });
 

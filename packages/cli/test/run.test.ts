@@ -17,7 +17,8 @@ function buildSceneProject(src: string): string {
     height: 6, note: "", parallaxLoopX: false, parallaxLoopY: false, parallaxName: "",
     parallaxShow: true, parallaxSx: 0, parallaxSy: 0, scrollType: 0, specifyBattleback: false,
     tilesetId: 1, width: 8,
-    data: new Array(48).fill(0),
+    // tile 10 = 默认图块集里四向可走的真地面（flags 1536 无阻挡位；tile 0 水面、tile 1 墙）
+    data: new Array(48).fill(10),
     events: [
       null,
       {
@@ -48,6 +49,8 @@ function buildSceneProject(src: string): string {
 
   const system = JSON.parse(readFileSync(path.join(dir, "data", "System.json"), "utf8"));
   system["startMapId"] = 2;
+  system["startX"] = 2;
+  system["startY"] = 2;
   writeFileSync(path.join(dir, "data", "System.json"), JSON.stringify(system));
 
   return dir;
@@ -98,6 +101,74 @@ describe.skipIf(!PROJECT)("CLI run（真实引擎）", () => {
       expect(result.stepResults).toHaveLength(2);
       expect(result.stepResults[1]!.message).toContain("开关 5");
       expect(result.stepResults[1]!.message).toContain("实际 false");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("对话选项导航：choose 选第二项 → 走对应分支", { timeout: 180_000 }, async () => {
+    const dir = buildSceneProject(PROJECT!);
+    // 把事件改成带选项：选项A → 开关5，选项B → 开关6
+    const map2 = JSON.parse(readFileSync(path.join(dir, "data", "Map002.json"), "utf8"));
+    const ev = map2["events"][1];
+    ev["pages"][0]["list"] = [
+      { code: 102, indent: 0, parameters: [["选项A", "选项B"], 0] },
+      { code: 402, indent: 0, parameters: [0] }, // When 选项A（与 102 同级缩进，实证引擎语义）
+      { code: 121, indent: 1, parameters: [5, 5, 0] },
+      { code: 402, indent: 0, parameters: [1] }, // When 选项B
+      { code: 121, indent: 1, parameters: [6, 6, 0] },
+      { code: 403, indent: 0, parameters: [] }, // When 取消
+      { code: 404, indent: 0, parameters: [] },
+      { code: 0, indent: 0, parameters: [] },
+    ];
+    writeFileSync(path.join(dir, "data", "Map002.json"), JSON.stringify(map2));
+    const scenarioPath = path.join(dir, "scenario.json");
+    writeFileSync(
+      scenarioPath,
+      JSON.stringify({
+        id: "choice-1",
+        steps: [
+          { type: "start_new_game" },
+          { type: "walk", to: { map: 2, x: 5, y: 5 } },
+          { type: "interact", direction: "up" },
+          { type: "choose", index: 1 },
+          { type: "assert_switch", switchId: 6, value: true },
+          { type: "assert_switch", switchId: 5, value: false },
+        ],
+      }),
+    );
+    try {
+      const result = await runScenarioCli(dir, scenarioPath);
+      expect(result.passed).toBe(true);
+      expect(result.stepResults.map((s) => s.passed)).toEqual([true, true, true, true, true, true]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("walk 路径模拟：瓦片阻挡 → 路径不可达失败", { timeout: 180_000 }, async () => {
+    const dir = buildSceneProject(PROJECT!);
+    // 在 y=3 行放满真实水面（tile 0，默认图块集不可走），完全隔开 (2,2) 与 (5,5)
+    const map2 = JSON.parse(readFileSync(path.join(dir, "data", "Map002.json"), "utf8"));
+    const data = map2["data"];
+    for (let x = 0; x <= 7; x++) data[3 * 8 + x] = 0; // 整行水面
+    writeFileSync(path.join(dir, "data", "Map002.json"), JSON.stringify(map2));
+
+    const scenarioPath = path.join(dir, "scenario.json");
+    writeFileSync(
+      scenarioPath,
+      JSON.stringify({
+        id: "wall-1",
+        steps: [
+          { type: "start_new_game" },
+          { type: "walk", to: { map: 2, x: 5, y: 5 } },
+        ],
+      }),
+    );
+    try {
+      const result = await runScenarioCli(dir, scenarioPath);
+      expect(result.passed).toBe(false);
+      expect(result.stepResults[1]!.message).toContain("路径不可达");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

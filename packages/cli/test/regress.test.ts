@@ -19,7 +19,8 @@ function buildSceneProject(src: string): string {
     height: 6, note: "", parallaxLoopX: false, parallaxLoopY: false, parallaxName: "",
     parallaxShow: true, parallaxSx: 0, parallaxSy: 0, scrollType: 0, specifyBattleback: false,
     tilesetId: 1, width: 8,
-    data: new Array(48).fill(0),
+    // tile 10 = 默认图块集里四向可走的真地面（flags 1536 无阻挡位；tile 0 水面、tile 1 墙）
+    data: new Array(48).fill(10),
     events: [
       null,
       {
@@ -50,6 +51,8 @@ function buildSceneProject(src: string): string {
 
   const system = JSON.parse(readFileSync(path.join(dir, "data", "System.json"), "utf8"));
   system["startMapId"] = 2;
+  system["startX"] = 2;
+  system["startY"] = 2;
   writeFileSync(path.join(dir, "data", "System.json"), JSON.stringify(system));
 
   return dir;

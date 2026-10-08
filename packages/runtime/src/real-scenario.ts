@@ -1,14 +1,14 @@
 /**
  * 真实引擎场景执行器 —— DSL 场景跑在真实 MV 引擎上。
  *
- * 与 stub 执行器的语义差异（诚实声明）：
- * - walk = 直接定位玩家（不模拟行走路径/碰撞）
- * - interact = 触发玩家脚下事件并驱动到结束（消息出现即按确定）
- * - choose = 暂不支持（对话选项导航待实现），显式失败而非假通过
+ * 语义（真实引擎保真）：
+ * - walk = 瓦片通行性 BFS 路径模拟（忽略事件阻挡——事件是交互目标），路径不可达即失败
+ * - interact = 面向触发：先前方一格再脚下（覆盖"站在事件上"与"面向事件"两种交互）
+ * - choose = 方向键导航到选项 + 确定，再驱动事件到结束
  */
 import type { Page } from "puppeteer-core";
 import type { Scenario } from "@rmtest/dsl";
-import { pressOk, snapshotReal, triggerAt, gotoMap, type RealSnapshot } from "./realengine.ts";
+import { pressKey, pressOk, snapshotReal, triggerFront, gotoMap, walkPathTo, type RealSnapshot } from "./realengine.ts";
 
 export interface RealScenarioResult {
   scenarioId: string;
@@ -17,11 +17,31 @@ export interface RealScenarioResult {
   finalSnapshot: RealSnapshot;
 }
 
-interface RealWindow {
-  __rmtestReal: { setPlayer: (x: number, y: number) => void };
-}
-
 const sleepMs = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
+async function driveEventToEnd(
+  page: Page,
+  timeoutMs = 20_000,
+  opts: { confirmChoices?: boolean } = {},
+): Promise<{ ok: boolean; outcome: "done" | "choice"; message?: string }> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const s = await snapshotReal(page);
+    if (!s.eventRunning && !s.messageBusy && !s.choiceActive) return { ok: true, outcome: "done" };
+    if (s.choiceActive) {
+      if (opts.confirmChoices) {
+        // 单次按键可能被帧循环吞掉 → 重试直到选项被消费
+        await pressOk(page);
+        await sleepMs(120);
+        continue;
+      }
+      return { ok: true, outcome: "choice" }; // 对话分支：交给 choose 步骤
+    }
+    if (s.messageBusy) await pressOk(page);
+    if (Date.now() > deadline) return { ok: false, outcome: "done", message: "事件未在 20s 内完成" };
+    await sleepMs(100);
+  }
+}
 
 export async function executeRealScenario(page: Page, scenario: Scenario): Promise<RealScenarioResult> {
   const stepResults: RealScenarioResult["stepResults"] = [];
@@ -42,27 +62,48 @@ export async function executeRealScenario(page: Page, scenario: Scenario): Promi
         break;
       }
       case "walk": {
-        await page.evaluate(
-          (pos: { x: number; y: number }) => (window as unknown as RealWindow).__rmtestReal.setPlayer(pos.x, pos.y),
-          { x: step.to.x, y: step.to.y },
-        );
+        const ok = await walkPathTo(page, step.to.x, step.to.y);
+        if (!ok) {
+          passed = false;
+          message = `路径不可达: (${step.to.x}, ${step.to.y}) 被瓦片阻挡`;
+        }
         break;
       }
       case "interact": {
         const snap = await snapshotReal(page);
-        await triggerAt(page, snap.playerX, snap.playerY);
-        // 驱动事件到结束：消息出现就按确定
-        const deadline = Date.now() + 20_000;
+        await triggerFront(page, snap.playerX, snap.playerY, step.direction);
+        const driven = await driveEventToEnd(page);
+        if (!driven.ok) {
+          passed = false;
+          message = driven.message;
+        } else if (driven.outcome === "choice") {
+          message = "对话分支出现（交给 choose 步骤）";
+        }
+        break;
+      }
+      case "choose": {
+        // 选项窗口有打开动画：等它真正激活再按键
+        const winDeadline = Date.now() + 5_000;
         for (;;) {
           const s = await snapshotReal(page);
-          if (!s.eventRunning && !s.messageBusy) break;
-          if (s.messageBusy) await pressOk(page);
-          if (Date.now() > deadline) {
+          if (s.choiceWindowActive) break;
+          if (Date.now() > winDeadline) {
             passed = false;
-            message = "事件未在 20s 内完成";
+            message = "选项窗口未在 5s 内激活";
             break;
           }
           await sleepMs(100);
+        }
+        if (!passed) break;
+        for (let n = 0; n < step.index; n++) {
+          await pressKey(page, "down");
+          await sleepMs(120); // 让帧循环消费（单次注入会被下一帧清掉）
+        }
+        await pressOk(page);
+        const driven = await driveEventToEnd(page, 20_000, { confirmChoices: true });
+        if (!driven.ok) {
+          passed = false;
+          message = driven.message;
         }
         break;
       }
@@ -86,10 +127,6 @@ export async function executeRealScenario(page: Page, scenario: Scenario): Promi
         if (!passed) message = `地图期望 ${step.map}，实际 ${s.mapId}`;
         break;
       }
-      case "choose":
-        passed = false;
-        message = "choose 在真实引擎执行器上暂不支持（对话选项导航待实现）";
-        break;
     }
 
     stepResults.push({ index: i, type: step.type, passed, message });

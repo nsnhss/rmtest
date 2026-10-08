@@ -89,8 +89,8 @@ export async function startRecording(page: Page, opts: RecorderOptions = {}): Pr
             pendingSteps = 0;
           }
           const s = await snapshotReal(page);
-          if (s.messageBusy) {
-            await pressOk(page);
+          if (s.messageBusy || s.choiceActive) {
+            await pressOk(page); // 消息确认 / 确认当前选项
           } else {
             steps.push({ type: "interact", direction: "up" });
             await triggerAt(page, s.playerX, s.playerY);
@@ -98,8 +98,9 @@ export async function startRecording(page: Page, opts: RecorderOptions = {}): Pr
             const deadline = Date.now() + 20_000;
             for (;;) {
               const t = await snapshotReal(page);
-              if (!t.eventRunning && !t.messageBusy) break;
+              if (!t.eventRunning && !t.messageBusy && !t.choiceActive) break;
               if (t.messageBusy) await pressOk(page);
+              if (t.choiceActive) break; // 选项留给后续按键
               if (Date.now() > deadline) break;
               await sleepMs(100);
             }

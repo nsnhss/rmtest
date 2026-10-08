@@ -28,6 +28,8 @@ export interface RealSnapshot {
   playerY: number;
   eventRunning: boolean;
   messageBusy: boolean;
+  choiceActive: boolean;
+  choiceWindowActive: boolean;
   dataMapWidth: number;
   dataMapHeight: number;
 }
@@ -83,6 +85,60 @@ const BRIDGE = `(() => {
       Input._currentState["ok"] = true;
       Input._previousState["ok"] = false;
     },
+    pressKey(k) {
+      Input._currentState[k] = true;
+      Input._previousState[k] = false;
+    },
+    // 面向触发：先试前方一格，再试脚下（覆盖"站在事件上"与"面向事件"两种真实交互）
+    triggerFront(x, y, dir) {
+      const dirs = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+      const [dx, dy] = dirs[dir] || [0, 0];
+      const fx = x + dx, fy = y + dy;
+      $gamePlayer.startMapEvent(fx, fy, [0], true);
+      $gamePlayer.startMapEvent(x, y, [0], true);
+    },
+    // 路径模拟：BFS 尊重瓦片通行性（忽略事件阻挡——事件是交互目标）
+    async walkPathTo(tx, ty) {
+      const startX = $gamePlayer._x, startY = $gamePlayer._y;
+      const w = $gameMap.width(), h = $gameMap.height();
+      const key = (x, y) => x + "," + y;
+      // 方向位：1下/2左/4右/8上；checkPassage(x,y,bit) true = 该方向可进
+      const dirs = [[0, -1, 8], [0, 1, 1], [-1, 0, 2], [1, 0, 4]];
+      const from = new Map();
+      const visited = new Set([key(startX, startY)]);
+      const queue = [[startX, startY]];
+      while (queue.length > 0) {
+        const [cx, cy] = queue.shift();
+        if (cx === tx && cy === ty) break;
+        for (const [dx, dy, bit] of dirs) {
+          const nx = cx + dx, ny = cy + dy;
+          if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+          const k = key(nx, ny);
+          if (visited.has(k)) continue;
+          // checkPassage(x, y, bit): bit = 进入方向（2下/4左/6右/8上），true = 可进
+          if (!$gameMap.checkPassage(nx, ny, bit)) continue;
+          visited.add(k);
+          from.set(k, key(cx, cy));
+          queue.push([nx, ny]);
+        }
+      }
+      const target = key(tx, ty);
+      if (!from.has(target) && !(tx === startX && ty === startY)) return false;
+      const path = [];
+      let cur = target;
+      while (cur !== key(startX, startY)) {
+        path.push(cur);
+        cur = from.get(cur);
+        if (!cur) return false;
+      }
+      path.reverse();
+      for (const cell of path) {
+        const [px, py] = cell.split(",").map(Number);
+        $gamePlayer.locate(px, py);
+        await sleep(30);
+      }
+      return true;
+    },
     isEventRunning() { return $gameMap.isEventRunning(); },
     messageBusy() { return $gameMessage.isBusy(); },
     saveGame(slot) { return DataManager.saveGame(slot); },
@@ -113,6 +169,13 @@ const BRIDGE = `(() => {
         playerY: $gamePlayer._y,
         eventRunning: $gameMap ? $gameMap.isEventRunning() : false,
         messageBusy: $gameMessage.isBusy(),
+        choiceActive: $gameMessage._choices ? $gameMessage._choices.length > 0 : false,
+        choiceWindowActive: (() => {
+          const win = SceneManager._scene && SceneManager._scene._messageWindow
+            ? SceneManager._scene._messageWindow._choiceWindow
+            : null;
+          return !!win && win.active;
+        })(),
         dataMapWidth: $dataMap ? $dataMap.width : 0,
         dataMapHeight: $dataMap ? $dataMap.height : 0,
       };
@@ -205,7 +268,10 @@ interface RealBridge {
   gotoMap: () => Promise<boolean>;
   setPlayer: (x: number, y: number) => void;
   triggerAt: (x: number, y: number) => void;
+  triggerFront: (x: number, y: number, dir: "up" | "down" | "left" | "right") => void;
   pressOk: () => void;
+  pressKey: (k: string) => void;
+  walkPathTo: (x: number, y: number) => Promise<boolean>;
   isEventRunning: () => boolean;
   messageBusy: () => boolean;
   saveGame: (slot: number) => boolean;
@@ -232,6 +298,25 @@ export async function triggerAt(page: Page, x: number, y: number): Promise<void>
 
 export async function pressOk(page: Page): Promise<void> {
   await page.evaluate(() => (window as unknown as RealWindow).__rmtestReal.pressOk());
+}
+
+export async function pressKey(page: Page, key: string): Promise<void> {
+  await page.evaluate((k) => (window as unknown as RealWindow).__rmtestReal.pressKey(k), key);
+}
+
+export async function walkPathTo(page: Page, x: number, y: number): Promise<boolean> {
+  return (await page.evaluate(
+    (pos: { x: number; y: number }) => (window as unknown as RealWindow).__rmtestReal.walkPathTo(pos.x, pos.y),
+    { x, y },
+  )) as boolean;
+}
+
+export async function triggerFront(page: Page, x: number, y: number, dir: "up" | "down" | "left" | "right"): Promise<void> {
+  await page.evaluate(
+    (a: { x: number; y: number; dir: "up" | "down" | "left" | "right" }) =>
+      (window as unknown as RealWindow).__rmtestReal.triggerFront(a.x, a.y, a.dir),
+    { x, y, dir },
+  );
 }
 
 export async function saveGame(page: Page, slot: number): Promise<boolean> {

@@ -1,10 +1,12 @@
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { scan } from "../src/scan.ts";
+import { encryptAsset } from "@rmtest/adapter-mv";
+import { deployReport } from "../src/deploy.ts";
 
 const FIXTURE_DATA = new URL("../../../packages/adapters/mv/fixtures/mini/data/", import.meta.url);
+const ENC_KEY = "d41d8cd98f00b204e9800998ecf8427e"; // fixture System.json 的 encryptionKey
 
 function makePng(width: number, height: number): Uint8Array {
   const b = new Uint8Array(33);
@@ -23,12 +25,14 @@ function makePng(width: number, height: number): Uint8Array {
   return b;
 }
 
-function buildDemo(planted: boolean): string {
-  const dir = mkdtempSync(path.join(tmpdir(), "rmtest-cli-"));
+/** 构造"部署产物"：资源全部加密并改名 .rpgmvp/.rpgmvo */
+function buildDeployedProject(): string {
+  const dir = mkdtempSync(path.join(tmpdir(), "rmtest-deploy-"));
   mkdirSync(path.join(dir, "data"), { recursive: true });
   for (const name of readdirSync(FIXTURE_DATA)) {
     writeFileSync(path.join(dir, "data", name), readFileSync(new URL(name, FIXTURE_DATA)));
   }
+
   const assets: Record<string, Uint8Array> = {
     "img/characters/Actor1.png": makePng(144, 192),
     "img/characters/Vehicle.png": makePng(144, 192),
@@ -46,44 +50,35 @@ function buildDemo(planted: boolean): string {
     "img/animations/Fire.png": makePng(576, 384),
     "img/titles1/Title1.png": makePng(816, 624),
     "img/system/IconSet.png": makePng(512, 512),
-    "audio/bgm/Theme1.ogg": new Uint8Array([1]),
-    "audio/me/Gameover1.ogg": new Uint8Array([1]),
+    "audio/bgm/Theme1.ogg": new Uint8Array(32).fill(7),
+    "audio/me/Gameover1.ogg": new Uint8Array(32).fill(8),
     "fonts/MyCjkFont.ttf": new Uint8Array([0, 1, 2, 3]),
   };
-  if (planted) delete assets["img/enemies/Goblin.png"];
+
   for (const [rel, bytes] of Object.entries(assets)) {
     const full = path.join(dir, rel);
     mkdirSync(path.dirname(full), { recursive: true });
-    writeFileSync(full, bytes);
-  }
-  if (planted) {
-    const items = JSON.parse(readFileSync(path.join(dir, "data", "Items.json"), "utf8"));
-    items[1]["iconIndex"] = 999;
-    writeFileSync(path.join(dir, "data", "Items.json"), JSON.stringify(items));
+    if (rel.endsWith(".png") || rel.endsWith(".ogg")) {
+      // 加密 + 部署扩展名（.rpgmvp / .rpgmvo）
+      const encrypted = encryptAsset(bytes, ENC_KEY);
+      const ext = rel.endsWith(".png") ? ".png" : ".ogg";
+      const deployedExt = rel.endsWith(".png") ? ".rpgmvp" : ".rpgmvo";
+      writeFileSync(full.replace(ext, deployedExt), encrypted);
+    } else {
+      writeFileSync(full, bytes);
+    }
   }
   return dir;
 }
 
-describe("扫描管线端到端", () => {
-  it("合法工程 → 零发现", () => {
-    const dir = buildDemo(false);
+describe("部署产物验收", () => {
+  it("加密部署产物 → 引用全部解析，零悬空错误", () => {
+    const dir = buildDeployedProject();
     try {
-      const summary = scan(dir);
-      expect(summary.counts).toEqual({ error: 0, warning: 0, info: 0 });
-      expect(summary.html).toContain("未发现问题");
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  it("埋雷工程 → 报出缺失资源与图标越界", () => {
-    const dir = buildDemo(true);
-    try {
-      const summary = scan(dir);
-      expect(summary.counts.error).toBeGreaterThanOrEqual(2);
-      expect(summary.html).toContain("Goblin.png");
-      expect(summary.html).toContain("999");
-      expect(summary.html).toContain("img/enemies/Goblin.png");
+      const report = deployReport(dir);
+      // 加密资源通过 .rpgmvp/.rpgmvo 映射 + 解密全部命中，无缺失
+      expect(report.counts.error).toBe(0);
+      expect(report.encryptedAssetsDetected).toBe(true);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

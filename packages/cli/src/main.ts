@@ -13,6 +13,7 @@ import path from "node:path";
 import { aigen, defaultProvider } from "./aigen.ts";
 import { contentReport } from "./content.ts";
 import { corpusAdd, corpusList } from "./corpus.ts";
+import { deployReport } from "./deploy.ts";
 import { explainFailure } from "./explain.ts";
 import { fuzzCli } from "./fuzz.ts";
 import { goldenCli } from "./golden.ts";
@@ -255,6 +256,17 @@ if (cmd === "maintain") {
     }
   } catch (err) {
     console.error(`repair 失败: ${err instanceof Error ? err.message : String(err)}`);
+    process.exit(2);
+  }
+} else if (cmd === "deploy") {
+  const projectDir = path.resolve(process.argv[3] ?? ".");
+  try {
+    const r = deployReport(projectDir);
+    console.log(`错误 ${r.counts.error} · 警告 ${r.counts.warning} · 提示 ${r.counts.info}`);
+    console.log(`部署专项: 大小写不一致 ${r.caseMismatches} 处${r.caseMismatches > 0 ? "（部署到 Linux/移动端会缺失）" : ""}`);
+    process.exitCode = r.counts.error > 0 ? 1 : 0;
+  } catch (err) {
+    console.error(`deploy 失败: ${err instanceof Error ? err.message : String(err)}`);
     process.exit(2);
   }
 } else {

@@ -76,3 +76,13 @@ AI 只做翻译，不做判定：
 - fuzz 确定性种子（mulberry32）
 - 场景绑定记录游戏内容指纹 + 引擎版本
 - 每次运行结果入项目库（SQLite），历史可查
+
+## 9. 插件分发
+
+Checker 插件是**单文件 ES 模块**（见 `examples/checkers/sample-checker.ts`）。分发 = 分享文件：
+
+1. 作者写一个 checker 文件（默认导出 `CheckerPlugin` 或数组）
+2. 用户放到任意目录，`loadCheckersFromDir(dir)` 动态加载
+3. manifest 声明 `irVersion`，加载时做兼容闸门；坏插件隔离不炸加载器
+
+无需发布平台、无需版本管理器——文件级分发对社区场景最直接。插件内嵌 fixture 回归资产的约定见 roadmap。

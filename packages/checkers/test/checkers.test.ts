@@ -264,6 +264,20 @@ describe("checkers v1", () => {
     }
   });
 
+  it("CJK 文本 + 无 CJK 字体 → font-check 告警", () => {
+    const assets = fullAssets();
+    delete assets["fonts/MyCjkFont.ttf"];
+    const p = buildProject(assets);
+    try {
+      const sections = run(p.loaded()).sections;
+      const hit = sections.filter((s) => s.type === "font-check");
+      expect(hit).toHaveLength(1);
+      expect(hit[0]).toMatchObject({ severity: "warning", confidence: "medium" });
+    } finally {
+      p.destroy();
+    }
+  });
+
   it("插件抛异常 → 记录错误，其余检查器照跑（内核隔离）", () => {
     const p = buildProject(fullAssets());
     try {

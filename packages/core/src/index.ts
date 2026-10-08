@@ -7,4 +7,5 @@ export * from "./universe.ts";
 export * from "./facts/refgraph.ts";
 export * from "./facts/lifecycle.ts";
 export * from "./facts/reachables.ts";
+export * from "./facts/entity-hashes.ts";
 export * from "./kernel.ts";

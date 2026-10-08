@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { IR_SCHEMA_VERSION, type IRDocument } from "@rmtest/core";
+import { Cmd, IR_SCHEMA_VERSION, switchWriteSignature, type IRDocument } from "@rmtest/core";
 import type { Scenario } from "@rmtest/dsl";
 import { relinkScenario } from "../src/relink.ts";
 
@@ -106,4 +106,42 @@ describe("机械重链", () => {
     expect(out.relinked).toEqual([]);
     expect(out.unresolved).toEqual([]);
   });
+
+  it("开关引用失效 → 写入签名唯一命中 → 重链", () => {
+    // ir 里开关 1 有写入（121 置 ON）
+    const doc = irWithSwitchWriter();
+    const sig = switchWriteSignature(doc, 1)!;
+    const s: Scenario = {
+      id: "s2",
+      bindings: [{ kind: "switch", id: 9, hash: sig }],
+      steps: [
+        { type: "start_new_game" },
+        { type: "assert_switch", switchId: 9, value: true }, // 开关 9 不存在（fixture 只有 2 个开关）
+      ],
+    };
+    const out = relinkScenario(s, doc, new Map());
+    expect(out.relinked).toEqual([{ kind: "switch", fromId: 9, toId: 1 }]);
+    expect(out.scenario.steps[1]).toMatchObject({ type: "assert_switch", switchId: 1 });
+  });
 });
+
+function irWithSwitchWriter(): IRDocument {
+  const doc = ir([1, 2]);
+  doc.maps[0]!.events = [
+    {
+      id: 1,
+      name: "Writer",
+      x: 1,
+      y: 1,
+      pages: [
+        {
+          index: 0,
+          conditions: { selfSwitchCh: null, switch1Id: null, switch2Id: null, variableId: null, variableValue: 0, actorId: null, itemId: null },
+          trigger: 0,
+          commands: [{ code: Cmd.ControlSwitches, indent: 0, parameters: [1, 1, 0] }],
+        },
+      ],
+    },
+  ];
+  return doc;
+}

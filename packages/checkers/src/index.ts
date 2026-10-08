@@ -7,6 +7,7 @@ import { readNeverWrittenChecker, writtenNeverReadChecker } from "./checkers/lif
 import { pictureNoEraseChecker, pictureOffscreenChecker } from "./checkers/picture.ts";
 import { unreachableMapChecker } from "./checkers/reachability.ts";
 import { transferSoftlockChecker } from "./checkers/transfer.ts";
+import { fontChecker } from "./checkers/font.ts";
 import { textOverflowChecker } from "./checkers/text-overflow.ts";
 
 export const checkers: CheckerPlugin[] = [
@@ -21,6 +22,7 @@ export const checkers: CheckerPlugin[] = [
   writtenNeverReadChecker,
   transferSoftlockChecker,
   unreachableMapChecker,
+  fontChecker,
 ];
 
 export { danglingRefChecker, assetDimensionChecker, faceIndexChecker, iconIndexChecker, pictureOffscreenChecker, pictureNoEraseChecker, textOverflowChecker };

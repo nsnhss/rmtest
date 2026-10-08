@@ -8,10 +8,11 @@
  * 是 System.json 整文件，无法定位个体，留待后续。
  */
 import type { IRDocument } from "@rmtest/core";
+import { switchHashes } from "@rmtest/core";
 import type { Scenario } from "@rmtest/dsl";
 
 export interface RelinkRecord {
-  kind: "map";
+  kind: "map" | "switch";
   fromId: number;
   toId: number;
 }
@@ -66,6 +67,34 @@ export function relinkScenario(
     step.to.map = toId;
     binding.id = toId;
     relinked.push({ kind: "map", fromId, toId });
+  });
+
+  // 开关引用失效 → 按写入签名哈希唯一匹配迁移
+  const switchSig = switchHashes(ir);
+  const switchCount = ir.system.switches.length;
+  next.steps.forEach((step, i) => {
+    if (step.type !== "assert_switch") return;
+    if (step.switchId < switchCount) return;
+
+    const binding = (next.bindings ?? []).find((b) => b.kind === "switch" && b.id === step.switchId);
+    if (!binding) {
+      unresolved.push(`第 ${i + 1} 步引用开关 ${step.switchId} 已不存在，且场景无绑定哈希可重链`);
+      return;
+    }
+
+    const candidates = [...switchSig.entries()].filter(([id, hash]) => id !== step.switchId && hash === binding.hash);
+    if (candidates.length !== 1) {
+      unresolved.push(
+        `第 ${i + 1} 步引用开关 ${step.switchId} 已不存在；写入签名匹配到 ${candidates.length} 个候选，无法唯一重链`,
+      );
+      return;
+    }
+
+    const [toId] = candidates[0]!;
+    const fromId = step.switchId;
+    step.switchId = toId;
+    binding.id = toId;
+    relinked.push({ kind: "switch", fromId, toId });
   });
 
   return { scenario: next, relinked, unresolved };

@@ -44,6 +44,7 @@ export function fullAssets(): Record<string, Uint8Array> {
     "img/system/IconSet.png": makePng(512, 512),
     "audio/bgm/Theme1.ogg": new Uint8Array([1, 2, 3]),
     "audio/me/Gameover1.ogg": new Uint8Array([1, 2, 3]),
+    "fonts/MyCjkFont.ttf": new Uint8Array([0, 1, 2, 3]),
   };
 }
 

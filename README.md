@@ -10,14 +10,15 @@
 |---|---|
 | 静态扫描 | `pnpm scan <工程目录>` → 控制台摘要 + `rmtest-report.html`（按严重度/置信度分组，带编辑器坐标） |
 | 语料维护 | `pnpm maintain <工程目录> <语料.json>` → fresh/broken/stale 三分类 + 机械重链 |
-| 12 个检查器 | 悬空引用、大小写、资源规格、脸图/图标越界、图片出屏、对话溢出、条件恒假、死逻辑、传送软锁（越界/卡墙/死格）、地图可达性 |
-| 动态测试机制 | 场景 DSL + 校验闸门 + 执行器（断言/失败即停）+ 覆盖计数 + fuzz + 求解器补测 + golden 截图 diff（stub 运行时验证机制；真实引擎解释器级验证已通过，`RM_REAL_PROJECT` 指向你的工程即可跑） |
-| 时效性引擎 | 测试实例与游戏内容的绑定指纹：fresh/broken/stale 三分类、内容哈希机械重链 |
-| 插件生态 | 用户自写 checker 从目录动态加载，坏插件隔离 |
-| AI 场景生成 | `pnpm aigen <工程> "自然语言需求"` → 校验闸门循环 → 合法场景 JSON（本地 Ollama + 聊天模型；判定与执行始终在确定性引擎，AI 只做翻译） |
-| 桌面应用 | `pnpm desktop`：扫描/维护/新内容三视图 |
+| 13 个检查器 | 悬空引用、大小写、资源规格、脸图/图标越界、图片出屏、对话溢出、条件恒假、死逻辑、传送软锁（越界/卡墙/死格）、地图可达性、CJK 字体缺失 |
+| 动态测试（真实引擎） | 场景 DSL 执行 `run`、随机探索 `fuzz`、截图基线 `golden`、键盘录制 `record`、一键回归 `regress`——全部跑在真实 MV/MZ 引擎上（需要你的工程） |
+| 时效性引擎 | fresh/broken/stale 三分类 + 内容哈希机械重链（地图 + 开关个体粒度） |
+| AI 层 | `aigen` 自然语言生成场景（校验闸门循环）、`repair` 过时场景修复提案、`explain` 失败轨迹翻译——本地 Ollama，判定始终在确定性引擎 |
+| 部署验收 | `deploy` 命令：加密产物解析 + 大小写专项 + 字体检查 |
+| 插件生态 | 用户自写 checker 文件级分发，`loadCheckersFromDir` 动态加载，坏插件隔离 |
+| 桌面应用 | `pnpm desktop`：扫描/维护/内容/AI 生成/场景库/运行中心六视图 |
 
-**测试：114 个，全部通过**（`pnpm test`；含 3 个真实引擎验证测试，设置 `RM_REAL_PROJECT` 指向你的 MV/MZ 工程即启用）；类型检查 `pnpm typecheck`。
+**测试：133 个，全部通过**（`pnpm test`；含 9 个真实引擎验证测试，设置 `RM_REAL_PROJECT` 指向你的 MV/MZ 工程即启用）；类型检查 `pnpm typecheck`。
 
 ## 快速开始
 
@@ -28,10 +29,16 @@ pnpm test          # 全量测试（含真实 Electron 驱动的动态测试）
 pnpm typecheck
 
 # 用起来
-pnpm scan ./你的MV工程
-pnpm maintain ./你的MV工程 ./corpus.json [--apply]
-pnpm aigen ./你的MV工程 "测试屠龙任务的完整流程"   # 需要 Ollama + 聊天模型（默认 qwen3:1.7b）
-pnpm desktop                                          # 桌面应用
+pnpm scan ./你的MV工程                          # 静态扫描 → HTML 报告
+pnpm maintain ./你的MV工程 ./corpus.json        # 语料三分类 + 重链
+pnpm aigen ./你的MV工程 "测试屠龙任务的完整流程"  # AI 生成场景（Ollama + 聊天模型）
+pnpm run ./你的MV工程 ./场景.json               # 真引擎执行场景
+pnpm fuzz ./你的MV工程                          # 真引擎随机探索
+pnpm golden ./你的MV工程 approve 菜单           # 截图基线审批
+pnpm corpus ./你的MV工程 add ./场景.json        # 场景入库
+pnpm regress ./你的MV工程                       # 一键回归
+pnpm deploy ./你的部署产物目录                   # 部署验收
+pnpm desktop                                    # 桌面应用
 ```
 
 语料 JSON 格式（场景 DSL）示例：

@@ -9,3 +9,4 @@ export * from "./corpus.ts";
 export * from "./regress.ts";
 export * from "./explain.ts";
 export * from "./repair.ts";
+export * from "./deploy.ts";

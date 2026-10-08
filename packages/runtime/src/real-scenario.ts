@@ -95,9 +95,34 @@ export async function executeRealScenario(page: Page, scenario: Scenario): Promi
           await sleepMs(100);
         }
         if (!passed) break;
+        // 导航到目标选项：按一次 → 等光标变化 → 没变才重试（防吞键、防冲过头）
         for (let n = 0; n < step.index; n++) {
-          await pressKey(page, "down");
-          await sleepMs(120); // 让帧循环消费（单次注入会被下一帧清掉）
+          let attempts = 0;
+          for (;;) {
+            const before = (await snapshotReal(page)).choiceIndex;
+            await pressKey(page, "down");
+            const changeDeadline = Date.now() + 500;
+            for (;;) {
+              const s = await snapshotReal(page);
+              if (s.choiceIndex !== before) break;
+              if (Date.now() > changeDeadline) break;
+              await sleepMs(80);
+            }
+            if ((await snapshotReal(page)).choiceIndex !== before) break;
+            attempts++;
+            if (attempts >= 3) {
+              passed = false;
+              message = "选项光标未响应按键";
+              break;
+            }
+          }
+          if (!passed) break;
+        }
+        if (!passed) break;
+        if ((await snapshotReal(page)).choiceIndex !== step.index) {
+          passed = false;
+          message = `选项光标位置不符（期望 ${step.index}，实际 ${(await snapshotReal(page)).choiceIndex}）`;
+          break;
         }
         await pressOk(page);
         const driven = await driveEventToEnd(page, 20_000, { confirmChoices: true });

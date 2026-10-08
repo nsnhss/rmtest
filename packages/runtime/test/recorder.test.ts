@@ -26,7 +26,8 @@ function buildSceneProject(src: string): string {
     height: 6, note: "", parallaxLoopX: false, parallaxLoopY: false, parallaxName: "",
     parallaxShow: true, parallaxSx: 0, parallaxSy: 0, scrollType: 0, specifyBattleback: false,
     tilesetId: 1, width: 8,
-    data: new Array(48).fill(0),
+    // tile 10 = 四向可走地面（回放的 walkPathTo 需要真实通行性）
+    data: new Array(48).fill(10),
     events: [
       null,
       {

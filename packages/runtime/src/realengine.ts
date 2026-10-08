@@ -30,6 +30,7 @@ export interface RealSnapshot {
   messageBusy: boolean;
   choiceActive: boolean;
   choiceWindowActive: boolean;
+  choiceIndex: number;
   dataMapWidth: number;
   dataMapHeight: number;
 }
@@ -175,6 +176,12 @@ const BRIDGE = `(() => {
             ? SceneManager._scene._messageWindow._choiceWindow
             : null;
           return !!win && win.active;
+        })(),
+        choiceIndex: (() => {
+          const win = SceneManager._scene && SceneManager._scene._messageWindow
+            ? SceneManager._scene._messageWindow._choiceWindow
+            : null;
+          return win ? win.index() : -1;
         })(),
         dataMapWidth: $dataMap ? $dataMap.width : 0,
         dataMapHeight: $dataMap ? $dataMap.height : 0,

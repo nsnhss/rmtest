@@ -62,7 +62,6 @@ export async function startRecording(page: Page, opts: RecorderOptions = {}): Pr
   // 录制从当前状态开始：场景第一帧记录当前位置
   const start = await snapshotReal(page);
   const steps: ScenarioStep[] = [{ type: "start_new_game" }];
-  let pendingDirection: [number, number] | null = null;
   let pendingSteps = 0;
 
   const poll = async (): Promise<void> => {
@@ -78,7 +77,15 @@ export async function startRecording(page: Page, opts: RecorderOptions = {}): Pr
         if (key === "Escape") return; // 停止
         const dir = DIRECTION_KEYS[key];
         if (dir) {
-          pendingDirection = dir;
+          // 逐键立即应用（批量只留最后一个会丢移动；连续移动在 Enter 时合并成一个 walk）
+          const s = await snapshotReal(page);
+          if (!s.eventRunning && !s.messageBusy && !s.choiceActive) {
+            await page.evaluate(
+              (pos: { x: number; y: number }) => (window as unknown as RecorderWindow).__rmtestReal.setPlayer(pos.x, pos.y),
+              { x: s.playerX + dir[0], y: s.playerY + dir[1] },
+            );
+            pendingSteps++;
+          }
           continue;
         }
         if (key === "Enter" || key === " ") {
@@ -105,23 +112,8 @@ export async function startRecording(page: Page, opts: RecorderOptions = {}): Pr
               await sleepMs(100);
             }
           }
-          pendingDirection = null;
           continue;
         }
-      }
-
-      // 应用待处理的方向移动
-      if (pendingDirection) {
-        const s = await snapshotReal(page);
-        if (!s.eventRunning && !s.messageBusy) {
-          const [dx, dy] = pendingDirection;
-          await page.evaluate(
-            (pos: { x: number; y: number }) => (window as unknown as RecorderWindow).__rmtestReal.setPlayer(pos.x, pos.y),
-            { x: s.playerX + dx, y: s.playerY + dy },
-          );
-          pendingSteps++;
-        }
-        pendingDirection = null;
       }
     }
   };
@@ -135,11 +127,12 @@ export async function startRecording(page: Page, opts: RecorderOptions = {}): Pr
       });
       await polling;
       const s = await snapshotReal(page);
-      // 末尾未落地的移动补一个 walk 到当前位置
-      const last = steps[steps.length - 1];
+      // 末尾未落地的移动补一个 walk 到当前位置（已记录过的位置不重复补）
       const moved = s.playerX !== start.playerX || s.playerY !== start.playerY;
-      const lastWalkToCurrent = last?.type === "walk" && last.to.x === s.playerX && last.to.y === s.playerY;
-      if (moved && !lastWalkToCurrent) {
+      const alreadyRecorded = steps.some(
+        (st) => st.type === "walk" && st.to.x === s.playerX && st.to.y === s.playerY,
+      );
+      if (moved && !alreadyRecorded) {
         steps.push({ type: "walk", to: { map: s.mapId, x: s.playerX, y: s.playerY } });
       }
       return ScenarioSchema.parse({ id: opts.scenarioId ?? "recorded", steps });

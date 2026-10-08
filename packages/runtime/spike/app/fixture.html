@@ -76,7 +76,8 @@ class Game_Interpreter {
       case 122:
         break;
       case 201:
-        this._data.transfer = { mapId: p[0], x: p[1], y: p[2] };
+        // 真实格式: [mode, mapId, x, y, dir, fade]；mode 0 = 直接指定
+        if (Number(p[0]) === 0) this._data.transfer = { mapId: p[1], x: p[2], y: p[3] };
         break;
       case 101:
       case 401:
@@ -106,7 +107,7 @@ window.__game = (() => {
       { code: 411, indent: 0, parameters: [] },
       { code: 121, indent: 1, parameters: [3, 3, 0] },
       { code: 412, indent: 0, parameters: [] },
-      { code: 201, indent: 0, parameters: [2, 2, 2, 0, 0] },
+      { code: 201, indent: 0, parameters: [0, 2, 2, 2, 0, 0] },
       { code: 0, indent: 0, parameters: [] },
     ],
   };

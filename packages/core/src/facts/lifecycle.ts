@@ -50,6 +50,17 @@ export function buildLifecycle(ir: IRDocument): Lifecycle {
       case Cmd.ControlSelfSwitch:
         if (loc.mapId && loc.eventId) write(selfSwitches, `${loc.mapId}:${loc.eventId}:${String(params[0])}`, loc);
         break;
+      case Cmd.TransferPlayer:
+        // mode 1/2 = 变量指定传送目标 → 变量读取
+        if (Number(params[0]) === 1) read(variables, Number(params[1]), loc);
+        else if (Number(params[0]) === 2) {
+          read(variables, Number(params[1]), loc);
+          read(variables, Number(params[2]), loc);
+        }
+        break;
+      case Cmd.BattleProcessing:
+        if (Number(params[0]) !== 0) read(variables, Number(params[1]), loc);
+        break;
       case Cmd.ConditionalBranch: {
         const type = Number(params[0]);
         if (type === 0) read(switches, Number(params[1]), loc);

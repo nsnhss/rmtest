@@ -106,9 +106,13 @@ export const transferSoftlockChecker: CheckerPlugin = {
           const loc = { mapId: map.id, eventId: ev.id, pageIndex: page.index };
           walkCommands(page.commands, loc, (cmd, cmdLoc) => {
             if (cmd.code !== Cmd.TransferPlayer) return;
-            const [mapId, x, y] = cmd.parameters.map(Number);
-            if (!Number.isFinite(mapId!) || !Number.isFinite(x!) || !Number.isFinite(y!)) return;
-            checkTarget(ir, mapId!, x!, y!, cmdLoc, "传送", sections);
+            // 真实格式: [mode, mapId, x, y, dir, fade]；变量指定（mode≠0）静态无法判定，跳过
+            if (Number(cmd.parameters[0]) !== 0) return;
+            const mapId = Number(cmd.parameters[1]);
+            const x = Number(cmd.parameters[2]);
+            const y = Number(cmd.parameters[3]);
+            if (!Number.isFinite(mapId) || !Number.isFinite(x) || !Number.isFinite(y)) return;
+            checkTarget(ir, mapId, x, y, cmdLoc, "传送", sections);
           });
         }
       }

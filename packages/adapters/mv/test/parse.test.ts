@@ -31,9 +31,9 @@ describe("MV 数据解析 → IR", () => {
     expect(page.trigger).toBe(0);
     const codes = page.commands.map((c) => c.code);
     expect(codes).toEqual([Cmd.ShowText, Cmd.ShowTextCont, Cmd.ControlSwitches, Cmd.TransferPlayer, Cmd.End]);
-    // 传送参数 [mapId, x, y, dir, fade]
+    // 传送参数 [mode, mapId, x, y, dir, fade]（mode 0 = 直接指定）
     const transfer = page.commands[3]!;
-    expect(transfer.parameters.slice(0, 3)).toEqual([2, 2, 2]);
+    expect(transfer.parameters.slice(0, 4)).toEqual([0, 2, 2, 2]);
   });
 
   it("页条件解析：EV002 需要开关 1 为 ON", () => {

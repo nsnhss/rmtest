@@ -15,7 +15,9 @@ export const unreachableMapChecker: CheckerPlugin = {
         for (const page of ev.pages) {
           walkCommands(page.commands, {}, (cmd) => {
             if (cmd.code !== Cmd.TransferPlayer) return;
-            const target = Number(cmd.parameters[0]);
+            // 真实格式 mode 0 = 直接指定地图；变量指定静态不可判定
+            if (Number(cmd.parameters[0]) !== 0) return;
+            const target = Number(cmd.parameters[1]);
             if (Number.isFinite(target) && edges.has(target)) edges.get(map.id)!.push(target);
           });
         }

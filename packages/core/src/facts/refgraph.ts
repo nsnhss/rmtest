@@ -164,7 +164,13 @@ function collectCommandRefs(
       add("actor", String(p[0]), loc);
       break;
     case Cmd.TransferPlayer:
-      add("map", String(p[0]), loc);
+      // 真实格式: [mode, mapId|varId, x|varId, y|varId, dir, fade]；mode 0=直接, 1/2=变量指定
+      if (Number(p[0]) === 0) add("map", String(p[1]), loc);
+      else if (Number(p[0]) === 1) add("variable", String(p[1]), loc);
+      else if (Number(p[0]) === 2) {
+        add("variable", String(p[1]), loc);
+        add("variable", String(p[2]), loc);
+      }
       break;
     case Cmd.SetMoveRoute: {
       // p[0] = { list: [{code:41, parameters:[characterName, characterIndex]}, ...] }
@@ -198,7 +204,9 @@ function collectCommandRefs(
       addAsset(assetPath("movies/", String(p[0] ?? ""), true));
       break;
     case Cmd.BattleProcessing:
-      add("troop", String(p[0]), loc);
+      // 真实格式: [mode, troopId|varId, canEscape, canLose]；mode 0=直接
+      if (Number(p[0]) === 0) add("troop", String(p[1]), loc);
+      else add("variable", String(p[1]), loc);
       break;
     case Cmd.ShopProcessing: {
       const goods = Array.isArray(p[0]) ? (p[0] as unknown[]) : [];

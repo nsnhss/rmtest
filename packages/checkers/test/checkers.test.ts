@@ -175,7 +175,7 @@ describe("checkers v1", () => {
         const page = (ev1["pages"] as Array<Record<string, unknown>>)[0]!;
         const list = page["list"] as Array<Record<string, unknown>>;
         const transfer = list.find((c) => c["code"] === 201)!;
-        transfer["parameters"] = [2, 9, 9, 0, 0];
+        transfer["parameters"] = [0, 2, 9, 9, 0, 0];
       });
       const sections = run(p.loaded()).sections;
       const hit = sections.filter((s) => s.type === "transfer-softlock" && s.message.includes("越界"));

@@ -16,7 +16,7 @@ const eventList = [
   { code: 101, indent: 0, parameters: ["", 0, 0, 2] },
   { code: 401, indent: 1, parameters: ["你好，世界"] },
   { code: 121, indent: 0, parameters: [12, 12, 0] },
-  { code: 201, indent: 0, parameters: [2, 5, 5, 0, 0] },
+  { code: 201, indent: 0, parameters: [0, 2, 5, 5, 0, 0] },
   { code: 0, indent: 0, parameters: [] },
 ];
 

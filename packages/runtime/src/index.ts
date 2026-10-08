@@ -6,3 +6,4 @@ export * from "./solver.ts";
 export * from "./screenshot.ts";
 export * from "./golden.ts";
 export * from "./security.ts";
+export * from "./realengine.ts";

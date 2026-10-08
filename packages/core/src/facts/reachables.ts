@@ -13,7 +13,9 @@ export function reachablePageKeys(ir: IRDocument): string[] {
       for (const p of ev.pages) {
         walkCommands(p.commands, {}, (cmd) => {
           if (cmd.code !== Cmd.TransferPlayer) return;
-          const target = Number(cmd.parameters[0]);
+          // 真实格式 mode 0 = 直接指定地图
+          if (Number(cmd.parameters[0]) !== 0) return;
+          const target = Number(cmd.parameters[1]);
           if (Number.isFinite(target) && edges.has(target)) edges.get(m.id)!.push(target);
         });
       }

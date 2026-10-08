@@ -18,6 +18,8 @@ export interface LaunchOptions {
   port?: number;
   /** 等待页面目标就绪的超时 ms */
   timeoutMs?: number;
+  /** 传给 Electron 进程的额外环境变量 */
+  env?: Record<string, string>;
 }
 
 /**
@@ -32,6 +34,7 @@ export async function launchElectron(
   const port = opts.port ?? 9222;
   const proc = spawn(opts.electronPath, [opts.appDir, `--remote-debugging-port=${port}`], {
     stdio: "ignore",
+    env: { ...process.env, ...(opts.env ?? {}) },
   });
 
   const deadline = Date.now() + (opts.timeoutMs ?? 30_000);

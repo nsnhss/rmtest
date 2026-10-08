@@ -55,7 +55,7 @@ describe("引用图收集", () => {
       { code: Cmd.ConditionalBranch, indent: 0, parameters: [0, 5] },
       { code: Cmd.ControlSwitches, indent: 1, parameters: [12, 12, 0] },
       { code: Cmd.ConditionalBranch, indent: 1, parameters: [1, 3, 0, 0] },
-      { code: Cmd.TransferPlayer, indent: 2, parameters: [99, 1, 1, 0, 0] },
+      { code: Cmd.TransferPlayer, indent: 2, parameters: [0, 99, 1, 1, 0, 0] },
       { code: Cmd.CallCommonEvent, indent: 0, parameters: [7] },
       { code: Cmd.ShowPicture, indent: 0, parameters: [1, "Logo", 1, 0, 0, 100, 100, 255, 0] },
       { code: Cmd.ChangeBgm, indent: 0, parameters: [{ name: "Town", volume: 90, pitch: 100, pan: 0 }] },
@@ -84,7 +84,7 @@ describe("引用图收集", () => {
   it("嵌套命令带正确位置", () => {
     const ir = irWith([
       { code: Cmd.ConditionalBranch, indent: 0, parameters: [0, 5] },
-      { code: Cmd.TransferPlayer, indent: 1, parameters: [99, 1, 1, 0, 0] },
+      { code: Cmd.TransferPlayer, indent: 1, parameters: [0, 99, 1, 1, 0, 0] },
     ]);
     const { refs } = buildRefGraph(ir);
     const transfer = refs.find((r) => r.category === "map" && r.target === "99")!;

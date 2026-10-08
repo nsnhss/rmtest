@@ -64,7 +64,7 @@ function ir(maps: IRDocument["maps"]): IRDocument {
   };
 }
 
-const transfer = (mapId: number): IRCommand => ({ code: Cmd.TransferPlayer, indent: 0, parameters: [mapId, 1, 1, 0, 0] });
+const transfer = (mapId: number): IRCommand => ({ code: Cmd.TransferPlayer, indent: 0, parameters: [0, mapId, 1, 1, 0, 0] });
 
 describe("可达事件页全集", () => {
   it("只含从开局沿传送可达的地图", () => {

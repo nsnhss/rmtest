@@ -218,6 +218,15 @@ importers:
 
   packages/core: {}
 
+  packages/dsl:
+    dependencies:
+      '@rmtest/core':
+        specifier: workspace:*
+        version: link:../core
+      zod:
+        specifier: ^4.0.0
+        version: 4.6.5
+
   packages/report:
     dependencies:
       '@rmtest/core':
@@ -229,6 +238,9 @@ importers:
       '@rmtest/core':
         specifier: workspace:*
         version: link:../core
+      '@rmtest/dsl':
+        specifier: workspace:*
+        version: link:../dsl
       puppeteer-core:
         specifier: ^25.12.0
         version: 25.12.0
@@ -1077,6 +1089,9 @@ packages:
   zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
 
+  zod@4.6.5:
+    resolution: {integrity: sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q==}
+
 snapshots:
 
   '@electron-internal/extract-zip@1.0.5': {}
@@ -1659,3 +1674,5 @@ snapshots:
       yargs-parser: 22.0.0
 
   zod@3.25.76: {}
+
+  zod@4.6.5: {}

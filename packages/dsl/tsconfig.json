@@ -3,5 +3,5 @@
   "compilerOptions": {
     "outDir": "dist"
   },
-  "include": ["src", "spike", "test"]
+  "include": ["src", "test"]
 }

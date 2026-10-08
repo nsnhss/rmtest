@@ -3,35 +3,30 @@
 <head><meta charset="utf-8"><title>rmtest-spike</title></head>
 <body>
 <!--
-  P0 验证线 2：模拟 MV 运行时表面（Game_Interpreter + $gameSwitches），
-  验证「CDP 驱动 + 事件解释器逐步执行 + 状态断言」的机制。
+  P0/P3 的运行时表面：模拟 MV 的 Game_Interpreter + 一个最小可玩世界，
+  验证「场景 DSL 执行 + 断言」的机制。
   真实引擎（rpg_objects.js 等）的保真验证需要用户自有的 MV/MZ 工程。
 -->
 <script>
 "use strict";
 
-window.$gameSwitches = {
-  _data: new Array(5000).fill(false),
-  setValue(id, value) { this._data[id] = !!value; },
-  value(id) { return !!this._data[id]; },
-};
-
+// —— MV 解释器表面（简化：同步推进，101 不等待） ——
 class Game_Interpreter {
   constructor() {
     this._list = null;
     this._index = 0;
     this._finished = false;
     this._eventId = 0;
-    this._data = { switches: window.$gameSwitches, transfer: null };
+    this._data = { switches: null, transfer: null };
   }
-  setup(list, eventId) {
+  setup(list, eventId, data) {
     this._list = list;
     this._index = 0;
     this._finished = false;
     this._eventId = eventId;
+    this._data = data;
   }
   isRunning() { return this._list !== null && !this._finished; }
-  // 真实引擎的 update 一帧只推进若干命令；spike 用 runToEnd 循环驱动
   step() {
     if (!this.isRunning()) return;
     const cmd = this._list[this._index];
@@ -43,44 +38,103 @@ class Game_Interpreter {
   executeCommand(cmd) {
     const p = cmd.parameters;
     switch (cmd.code) {
-      case 121: // Control Switches: [startId, endId, op] op=0 时 ON
+      case 121:
         for (let i = p[0]; i <= p[1]; i++) this._data.switches.setValue(i, p[2] === 0);
         break;
-      case 122: // Control Variables（spike 仅记录）
+      case 122:
         break;
-      case 201: // Transfer Player: [mapId, x, y, dir, fade]
+      case 201:
         this._data.transfer = { mapId: p[0], x: p[1], y: p[2] };
         break;
-      case 101: // Show Text：真实引擎会等待玩家确认，spike 直接跳过
-      case 401: // Show Text 续行
-      case 117: // Call Common Event
-      case 0:
+      case 101:
+      case 401:
+      case 117:
         break;
     }
   }
 }
 window.Game_Interpreter = Game_Interpreter;
 
+// —— 最小可玩世界（stub）：玩家 + 事件 + 开关/变量 ——
+const WORLD_START = { mapId: 1, x: 2, y: 2 };
+
+window.__game = (() => {
+  const world = { ...WORLD_START, switches: {}, variables: {}, transfer: null };
+  const interp = new Game_Interpreter();
+
+  // 地图 1 (2,2) 的事件：开开关 1 → 传送到地图 2 (2,2)
+  const events = {
+    "1:2:2": [
+      { code: 101, indent: 0, parameters: ["", 0, 0, 2] },
+      { code: 401, indent: 1, parameters: ["你好，世界"] },
+      { code: 121, indent: 0, parameters: [1, 1, 0] },
+      { code: 201, indent: 0, parameters: [2, 2, 2, 0, 0] },
+      { code: 0, indent: 0, parameters: [] },
+    ],
+  };
+
+  function runList(list) {
+    const switches = {
+      setValue(id, v) { world.switches[id] = !!v; },
+      value(id) { return !!world.switches[id]; },
+    };
+    interp.setup(list, 1, { switches, transfer: null });
+    let guard = 0;
+    while (interp.isRunning() && guard++ < 10000) interp.step();
+    if (interp._data.transfer) world.transfer = interp._data.transfer;
+  }
+
+  return {
+    startNewGame() {
+      world.mapId = WORLD_START.mapId;
+      world.x = WORLD_START.x;
+      world.y = WORLD_START.y;
+      world.switches = {};
+      world.variables = {};
+      world.transfer = null;
+    },
+    walk(x, y) {
+      world.x = x;
+      world.y = y;
+    },
+    interact() {
+      const list = events[`${world.mapId}:${world.x}:${world.y}`];
+      if (list) runList(list);
+    },
+    choose() { /* stub: 无对话分支 */ },
+    snapshot() {
+      return {
+        mapId: world.mapId,
+        x: world.x,
+        y: world.y,
+        switches: { ...world.switches },
+        variables: { ...world.variables },
+        transfer: world.transfer ? { ...world.transfer } : null,
+      };
+    },
+  };
+})();
+
 window.__spike = {
-  interpreter: null,
-  reset() {
-    this.interpreter = new Game_Interpreter();
-    return this;
-  },
+  reset() { this.interpreter = new Game_Interpreter(); return this; },
   runEvent(list, eventId) {
-    this.interpreter.setup(list, eventId ?? 0);
+    const switches = {};
+    const data = {
+      switches: {
+        setValue(id, v) { switches[id] = !!v; },
+        value(id) { return !!switches[id]; },
+      },
+      transfer: null,
+    };
+    this.interpreter.setup(list, eventId ?? 0, data);
     let guard = 0;
     while (this.interpreter.isRunning() && guard++ < 10000) this.interpreter.step();
-    return this.snapshot();
-  },
-  snapshot() {
-    const sw = this.interpreter._data.switches;
     return {
       finished: this.interpreter._finished,
       eventId: this.interpreter._eventId,
-      switch12: sw.value(12),
-      switch2: sw.value(2),
-      transfer: this.interpreter._data.transfer,
+      switch12: !!switches[12],
+      switch2: !!switches[2],
+      transfer: data.transfer,
     };
   },
 };

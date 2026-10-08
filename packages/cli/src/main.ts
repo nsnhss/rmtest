@@ -12,9 +12,11 @@ import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { aigen, defaultProvider } from "./aigen.ts";
 import { contentReport } from "./content.ts";
+import { corpusAdd, corpusList } from "./corpus.ts";
 import { fuzzCli } from "./fuzz.ts";
 import { goldenCli } from "./golden.ts";
 import { maintain } from "./maintain.ts";
+import { regressCli } from "./regress.ts";
 import { runScenarioCli } from "./run.ts";
 import { scan } from "./scan.ts";
 
@@ -165,6 +167,42 @@ if (cmd === "maintain") {
     }
   } catch (err) {
     console.error(`golden 失败: ${err instanceof Error ? err.message : String(err)}`);
+    process.exit(2);
+  }
+} else if (cmd === "corpus") {
+  const projectDir = path.resolve(process.argv[3] ?? ".");
+  const action = process.argv[4] ?? "list";
+  try {
+    if (action === "add") {
+      const scenarioPath = process.argv[5] ? path.resolve(process.argv[5]) : "";
+      if (!scenarioPath) {
+        console.error("用法: pnpm corpus <工程目录> add <场景.json>");
+        process.exit(2);
+      }
+      const r = corpusAdd(projectDir, scenarioPath);
+      console.log(`已入库: ${r.id}（${r.steps} 步）`);
+    } else {
+      const entries = corpusList(projectDir);
+      console.log(`语料 ${entries.length} 个场景:`);
+      for (const e of entries) {
+        console.log(`  [${e.status}] ${e.id}${e.issues.length > 0 ? ` — ${e.issues.join("; ")}` : ""}`);
+      }
+    }
+  } catch (err) {
+    console.error(`corpus 失败: ${err instanceof Error ? err.message : String(err)}`);
+    process.exit(2);
+  }
+} else if (cmd === "regress") {
+  const projectDir = path.resolve(process.argv[3] ?? ".");
+  try {
+    const summary = await regressCli(projectDir);
+    for (const item of summary.items) {
+      console.log(`  [${item.outcome}] (${item.status}) ${item.scenarioId}${item.message ? ` — ${item.message}` : ""}`);
+    }
+    console.log(`通过 ${summary.passed} · 失败 ${summary.failed} · 跳过 ${summary.skipped}`);
+    process.exitCode = summary.failed > 0 ? 1 : 0;
+  } catch (err) {
+    console.error(`regress 失败: ${err instanceof Error ? err.message : String(err)}`);
     process.exit(2);
   }
 } else {

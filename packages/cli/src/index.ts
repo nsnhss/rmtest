@@ -5,3 +5,5 @@ export * from "./aigen.ts";
 export * from "./run.ts";
 export * from "./fuzz.ts";
 export * from "./golden.ts";
+export * from "./corpus.ts";
+export * from "./regress.ts";

@@ -9,3 +9,4 @@ export * from "./security.ts";
 export * from "./realengine.ts";
 export * from "./real-scenario.ts";
 export * from "./real-fuzz.ts";
+export * from "./recorder.ts";

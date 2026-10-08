@@ -4,7 +4,7 @@
  */
 import { loadProject } from "@rmtest/adapter-mv";
 import { checkers } from "@rmtest/checkers";
-import { buildRefGraph, runCheckers } from "@rmtest/core";
+import { buildLifecycle, buildRefGraph, runCheckers } from "@rmtest/core";
 import { renderReport } from "@rmtest/report";
 
 export interface ScanSummary {
@@ -17,7 +17,12 @@ export interface ScanSummary {
 
 export function scan(projectDir: string): ScanSummary {
   const loaded = loadProject(projectDir);
-  const facts = { refgraph: buildRefGraph(loaded.ir), universe: loaded.universe, assets: loaded.assets };
+  const facts = {
+    refgraph: buildRefGraph(loaded.ir),
+    lifecycle: buildLifecycle(loaded.ir),
+    universe: loaded.universe,
+    assets: loaded.assets,
+  };
   const result = runCheckers(checkers, facts, loaded.ir);
 
   const counts = { error: 0, warning: 0, info: 0 };

@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { buildRefGraph, runCheckers, type CheckerPlugin, type CheckRunResult } from "@rmtest/core";
+import { buildLifecycle, buildRefGraph, runCheckers, type CheckerPlugin, type CheckRunResult } from "@rmtest/core";
 import type { LoadedProject } from "@rmtest/adapter-mv";
 import { checkers } from "../src/index.ts";
 import { buildProject, fullAssets, makePng } from "./helpers.ts";
 
 function run(loaded: LoadedProject): CheckRunResult {
-  const facts = { refgraph: buildRefGraph(loaded.ir), universe: loaded.universe, assets: loaded.assets };
+  const facts = {
+    refgraph: buildRefGraph(loaded.ir),
+    lifecycle: buildLifecycle(loaded.ir),
+    universe: loaded.universe,
+    assets: loaded.assets,
+  };
   return runCheckers(checkers, facts, loaded.ir);
 }
 
@@ -136,6 +141,32 @@ describe("checkers v1", () => {
     }
   });
 
+  it("条件恒假与死逻辑 → 生命周期检查器", () => {
+    const p = buildProject(fullAssets());
+    try {
+      // EV002 页条件从"读开关 1"改为"读开关 2"（开关 2 无人写）→ 恒假
+      // 同时开关 1 变成"写了没人读" → 死逻辑
+      p.writeJson("Map001.json", (d) => {
+        const ev2 = (d["events"] as Array<Record<string, unknown> | null>)[2]!;
+        const page = (ev2["pages"] as Array<Record<string, unknown>>)[0]!;
+        const cond = page["conditions"] as Record<string, unknown>;
+        cond["switch1Id"] = 2;
+      });
+      const sections = run(p.loaded()).sections;
+      const neverWritten = sections.filter((s) => s.type === "read-never-written");
+      expect(neverWritten).toHaveLength(1);
+      expect(neverWritten[0]!.message).toContain("开关 2");
+      expect(neverWritten[0]).toMatchObject({ severity: "error", confidence: "medium" });
+
+      const neverRead = sections.filter((s) => s.type === "written-never-read");
+      expect(neverRead).toHaveLength(1);
+      expect(neverRead[0]!.message).toContain("开关 1");
+      expect(neverRead[0]).toMatchObject({ severity: "info", confidence: "low" });
+    } finally {
+      p.destroy();
+    }
+  });
+
   it("插件抛异常 → 记录错误，其余检查器照跑（内核隔离）", () => {
     const p = buildProject(fullAssets());
     try {
@@ -146,7 +177,12 @@ describe("checkers v1", () => {
         },
       };
       const loaded = p.loaded();
-      const facts = { refgraph: buildRefGraph(loaded.ir), universe: loaded.universe, assets: loaded.assets };
+      const facts = {
+        refgraph: buildRefGraph(loaded.ir),
+        lifecycle: buildLifecycle(loaded.ir),
+        universe: loaded.universe,
+        assets: loaded.assets,
+      };
       const result = runCheckers([boom, ...checkers], facts, loaded.ir);
       expect(result.errors.some((e) => e.plugin === "boom" && e.message === "boom")).toBe(true);
       expect(result.sections).toEqual([]); // 合法工程其余检查器无报告，证明隔离有效

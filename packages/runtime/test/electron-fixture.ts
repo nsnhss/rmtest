@@ -16,7 +16,7 @@ export async function launchFixture(): Promise<ElectronFixture> {
   const electronExe = path.join(repoRoot, "node_modules", "electron", "dist", "electron.exe");
   const appDir = path.resolve(import.meta.dirname, "../spike/app");
   const port = 9400 + Math.floor(Math.random() * 500);
-  const session = await launchElectron((url) => connect({ browserURL: url }) as Promise<unknown>, {
+  const session = await launchElectron((url) => connect({ browserURL: url, defaultViewport: null }) as Promise<unknown>, {
     electronPath: electronExe,
     appDir,
     port,

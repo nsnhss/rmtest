@@ -3,3 +3,5 @@ export * from "./scenario.ts";
 export * from "./coverage.ts";
 export * from "./fuzz.ts";
 export * from "./solver.ts";
+export * from "./screenshot.ts";
+export * from "./golden.ts";

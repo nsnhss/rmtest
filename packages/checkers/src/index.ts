@@ -24,3 +24,4 @@ export const checkers: CheckerPlugin[] = [
 ];
 
 export { danglingRefChecker, assetDimensionChecker, faceIndexChecker, iconIndexChecker, pictureOffscreenChecker, pictureNoEraseChecker, textOverflowChecker };
+export * from "./loader.ts";

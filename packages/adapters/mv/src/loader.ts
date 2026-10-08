@@ -110,6 +110,12 @@ function collectAssets(
     }
     universe.assetFiles.add(mappedRel);
     universe.assetFilesLower.add(mappedRel.toLowerCase());
+    // 音频/视频引用不带扩展名（audio/bgm/Theme1），注册别名使引用可直接命中
+    const audioExt = path.extname(mappedRel).toLowerCase();
+    if (audioExt === ".ogg" || audioExt === ".m4a" || audioExt === ".m4v" || audioExt === ".webm") {
+      universe.assetFiles.add(mappedRel.slice(0, -audioExt.length));
+      universe.assetFilesLower.add(mappedRel.slice(0, -audioExt.length).toLowerCase());
+    }
     fileHashes.set(mappedRel, hashBytes(bytes));
 
     if (mappedRel.endsWith(".png")) {

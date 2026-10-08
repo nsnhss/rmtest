@@ -5,8 +5,8 @@ import { loadFixtureData } from "./helpers.ts";
 describe("MV 数据解析 → IR", () => {
   const { ir, warnings } = parseData(loadFixtureData());
 
-  it("解析出 1 张地图且无警告", () => {
-    expect(ir.maps).toHaveLength(1);
+  it("解析出 2 张地图且无警告", () => {
+    expect(ir.maps).toHaveLength(2);
     expect(warnings).toEqual([]);
   });
 
@@ -53,7 +53,7 @@ describe("MV 数据解析 → IR", () => {
 
   it("数据库与资源域解析", () => {
     expect(ir.tilesets[0]!.imageNames.slice(0, 3)).toEqual(["", "Outside_A1", "Outside_A2"]);
-    expect(ir.items.map((i) => i.iconIndex)).toEqual([5, 300]);
+    expect(ir.items.map((i) => i.iconIndex)).toEqual([5, 10]);
     expect(ir.weapons).toHaveLength(1);
     expect(ir.troops[0]!.enemyIds).toEqual([1, 2]);
     expect(ir.enemies[0]!.battlerName).toBe("Goblin");
@@ -79,7 +79,8 @@ describe("容错：坏数据不崩", () => {
     const files = loadFixtureData();
     delete files["Map001.json"];
     const result = parseData(files);
-    expect(result.ir.maps).toHaveLength(0);
+    expect(result.ir.maps).toHaveLength(1);
+    expect(result.ir.maps[0]!.id).toBe(2);
     expect(result.warnings.some((w) => w.includes("缺少数据文件"))).toBe(true);
   });
 

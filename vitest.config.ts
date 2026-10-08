@@ -5,7 +5,7 @@ export default defineConfig({
     include: ["packages/**/test/**/*.test.ts"],
     server: {
       deps: {
-        inline: ["@rmtest/core"],
+        inline: ["@rmtest/core", "@rmtest/adapter-mv"],
       },
     },
   },

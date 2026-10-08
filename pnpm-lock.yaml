@@ -191,6 +191,16 @@ importers:
         specifier: workspace:*
         version: link:../../core
 
+  packages/checkers:
+    dependencies:
+      '@rmtest/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@rmtest/adapter-mv':
+        specifier: workspace:*
+        version: link:../adapters/mv
+
   packages/core: {}
 
   packages/runtime:

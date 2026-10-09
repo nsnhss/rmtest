@@ -7,6 +7,7 @@
  * RM_REAL_PROJECT 指向本机工程，缺失时跳过。
  */
 import path from "node:path";
+import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { connect, type Browser, type Page } from "puppeteer-core";
 import { closeCdp, launchElectron, type CdpSession } from "./cdp.ts";
@@ -197,8 +198,20 @@ export interface RealGameOptions {
   timeoutMs?: number;
 }
 
+/** spike 应用目录：打包（import.meta 指向 bundle）与未打包（tsx）都能正确定位运行时包 */
+function runtimeAppDir(): string {
+  try {
+    // 解析包主入口（"./package.json" 子路径不在 exports 映射里，会抛 ERR_PACKAGE_PATH_NOT_EXPORTED）
+    const require = createRequire(import.meta.url);
+    const entryPath = require.resolve("@rmtest/runtime");
+    return path.join(path.dirname(entryPath), "../spike/app");
+  } catch {
+    return path.resolve(import.meta.dirname, "../spike/app");
+  }
+}
+
 export async function launchRealGame(projectDir: string, opts: RealGameOptions): Promise<RealGameSession> {
-  const appDir = path.resolve(import.meta.dirname, "../spike/app");
+  const appDir = runtimeAppDir();
   const gameUrl = pathToFileURL(path.join(projectDir, "index.html")).href;
   const port = opts.port ?? 9600 + Math.floor(Math.random() * 300);
 

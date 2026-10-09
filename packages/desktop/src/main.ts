@@ -128,15 +128,29 @@ let activeRecording: { handle: RecordingHandle; dir: string; win: BrowserWindow 
 ipcMain.handle("record-start", async (_e, dir: string) => {
   if (activeRecording) return { error: "已有录制会话在运行" };
   const url = pathToFileURL(path.join(dir, "index.html")).href;
-  const win = new BrowserWindow({ width: 816, height: 624, webPreferences: { contextIsolation: true, sandbox: true } });
+  const win = new BrowserWindow({
+    width: 816,
+    height: 624,
+    webPreferences: { contextIsolation: true, sandbox: true, backgroundThrottling: false },
+  });
+  // 捕获游戏页面错误栈（SceneManager 吞掉了栈，这里提前记录）
+  win.webContents.on("did-finish-load", () => {
+    void win.webContents.executeJavaScript(
+      `window.addEventListener('error', (e) => { window.__rmtestErrorStack = (e.error && e.error.stack) || String(e.message); });`,
+    );
+  });
   await win.loadURL(url);
   await win.webContents.executeJavaScript(REAL_BRIDGE);
 
   const adapter: GameHandle = {
-    evaluate: (fn, ...args) =>
-      win.webContents.executeJavaScript(
-        `(${fn.toString()})(${args.map((a) => JSON.stringify(a)).join(",")})`,
-      ) as Promise<unknown>,
+    evaluate: (fn, ...args) => {
+      // 字符串 = 完整代码（如 IIFE 桥脚本），直接执行；函数才 stringify + 传参
+      const code =
+        typeof fn === "function"
+          ? `(${fn.toString()})(${args.map((a) => JSON.stringify(a)).join(",")})`
+          : String(fn);
+      return win.webContents.executeJavaScript(code) as Promise<unknown>;
+    },
   };
 
   const deadline = Date.now() + 30_000;

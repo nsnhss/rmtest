@@ -1,5 +1,5 @@
 {
-  "name": "@rmtest/checkers",
+  "name": "@rmtest/adapter-tyrano",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -8,9 +8,5 @@
   },
   "dependencies": {
     "@rmtest/core": "workspace:*"
-  },
-  "devDependencies": {
-    "@rmtest/adapter-mv": "workspace:*",
-    "@rmtest/adapter-tyrano": "workspace:*"
   }
 }

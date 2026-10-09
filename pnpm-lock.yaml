@@ -203,6 +203,12 @@ importers:
         specifier: workspace:*
         version: link:../../core
 
+  packages/adapters/tyrano:
+    dependencies:
+      '@rmtest/core':
+        specifier: workspace:*
+        version: link:../../core
+
   packages/ai:
     dependencies:
       '@rmtest/core':
@@ -221,6 +227,9 @@ importers:
       '@rmtest/adapter-mv':
         specifier: workspace:*
         version: link:../adapters/mv
+      '@rmtest/adapter-tyrano':
+        specifier: workspace:*
+        version: link:../adapters/tyrano
 
   packages/cli:
     dependencies:
@@ -230,6 +239,9 @@ importers:
       '@rmtest/adapter-rgss':
         specifier: workspace:*
         version: link:../adapters/rgss
+      '@rmtest/adapter-tyrano':
+        specifier: workspace:*
+        version: link:../adapters/tyrano
       '@rmtest/ai':
         specifier: workspace:*
         version: link:../ai

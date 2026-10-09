@@ -7,11 +7,11 @@
  * 3. IR 只描述"数据驱动 RPG 引擎"的公共概念，不引入引擎特有实现细节。
  */
 
-export const IR_SCHEMA_VERSION = 1;
+export const IR_SCHEMA_VERSION = 2;
 
 export interface IRDocument {
   schemaVersion: number;
-  engine: "mv" | "mz" | "rgss";
+  engine: "mv" | "mz" | "rgss" | "tyrano";
   engineVersion?: string;
   system: IRSystem;
   maps: IRMap[];
@@ -26,6 +26,8 @@ export interface IRDocument {
   enemies: IREnemy[];
   animations: IRAnimation[];
   classes: IRClass[];
+  /** TyranoScript 工程专属数据；非 Tyrano 工程为 undefined */
+  tyrano?: IRTyranoSection;
 }
 
 export interface IRSystem {
@@ -186,4 +188,56 @@ export interface IRAnimation {
 export interface IRClass {
   id: number;
   name: string;
+}
+
+/* ---- TyranoScript（含 TyranoBuilder）附加段 ---- */
+
+/** TyranoScript 视觉小说数据；MV/MZ/RGSS 工程此字段为 undefined */
+export interface IRTyranoSection {
+  /** 场景清单（相对 data/scenario/，如 "first.ks"） */
+  scenarios: IRTyranoScenario[];
+  /** 各资产目录文件名清单（含扩展名，原始大小写） */
+  assets: Record<"bg" | "fg" | "image" | "se" | "bgm" | "voice" | "video", string[]>;
+  /** 入口场景（Config.tjs firstScenario，默认 "first.ks"） */
+  entryScenario: string;
+  /** 入口标签（Config.tjs firstLabel，默认 "*start"，含 * 前缀） */
+  entryLabel: string;
+}
+
+export interface IRTyranoScenario {
+  /** 相对 data/scenario/ 的文件名 */
+  file: string;
+  /** 解析出的标签块（按出现顺序） */
+  labels: IRTyranoLabel[];
+  /** 结构语法错误（未闭合 if/macro 等） */
+  syntaxErrors: Array<{ line: number; message: string }>;
+}
+
+export interface IRTyranoLabel {
+  /** 标签名（不含前导 *） */
+  name: string;
+  /** 行号（1 起） */
+  line: number;
+  /** 跳转/调用/按钮/链接目标 */
+  jumps: IRTyranoJump[];
+  /** 静态资产引用（storage 为字面量时） */
+  assets: IRTyranoAssetRef[];
+}
+
+export interface IRTyranoJump {
+  kind: "jump" | "call" | "button" | "link";
+  /** 目标标签名（已去 * 前缀）；动态表达式（&…）为 null */
+  target: string | null;
+  /** 目标场景文件；null = 当前场景 */
+  storage: string | null;
+  /** 本标签内该跳转之前是否出现过条件判断（if/elsif）——排除带条件的自跳循环 */
+  precededByCondition: boolean;
+  line: number;
+}
+
+export interface IRTyranoAssetRef {
+  kind: "bg" | "fg" | "image" | "bgm" | "se" | "voice" | "video";
+  /** 文件名（含扩展名）；动态表达式为 null，跳过检查 */
+  storage: string | null;
+  line: number;
 }

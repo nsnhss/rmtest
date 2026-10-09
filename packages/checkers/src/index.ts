@@ -10,6 +10,7 @@ import { transferSoftlockChecker } from "./checkers/transfer.ts";
 import { fontChecker } from "./checkers/font.ts";
 import { firstRunFalseChecker } from "./checkers/first-run-false.ts";
 import { textOverflowChecker } from "./checkers/text-overflow.ts";
+import { tyranoCheckers } from "./checkers/tyrano.ts";
 
 export const checkers: CheckerPlugin[] = [
   danglingRefChecker,
@@ -25,7 +26,16 @@ export const checkers: CheckerPlugin[] = [
   unreachableMapChecker,
   fontChecker,
   firstRunFalseChecker,
+  ...tyranoCheckers(),
 ];
 
 export { danglingRefChecker, assetDimensionChecker, faceIndexChecker, iconIndexChecker, pictureOffscreenChecker, pictureNoEraseChecker, textOverflowChecker };
+export {
+  tyranoBrokenJumpChecker,
+  tyranoEntryChecker,
+  tyranoMissingAssetChecker,
+  tyranoSelfLoopChecker,
+  tyranoSyntaxChecker,
+  tyranoUnreachableLabelChecker,
+} from "./checkers/tyrano.ts";
 export * from "./loader.ts";

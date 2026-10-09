@@ -9,6 +9,7 @@ import {
   fuzzRealGame,
   gotoMap,
   launchRealGame,
+  pageAsHandle,
   waitGameReady,
   type RealFuzzResult,
 } from "@rmtest/runtime";
@@ -25,7 +26,7 @@ export async function fuzzCli(projectDir: string, opts: FuzzCliOptions = {}): Pr
   const session = await launchRealGame(projectDir, { electronPath: electronExe });
   try {
     await waitGameReady(session.page);
-    const entered = await gotoMap(session.page);
+    const entered = await gotoMap(pageAsHandle(session.page));
     if (!entered) throw new Error("进入地图场景失败");
     return await fuzzRealGame(session.page, {
       maxSteps: opts.maxSteps ?? 500,

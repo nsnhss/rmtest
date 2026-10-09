@@ -35,7 +35,7 @@ export interface RealSnapshot {
   dataMapHeight: number;
 }
 
-const BRIDGE = `(() => {
+export const REAL_BRIDGE = `(() => {
   if (window.__rmtestReal) return "exists";
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   window.__rmtestReal = {
@@ -227,7 +227,7 @@ export async function launchRealGame(projectDir: string, opts: RealGameOptions):
   }
 
   // 注入桥（幂等）
-  await page.evaluate(BRIDGE);
+  await page.evaluate(REAL_BRIDGE);
   return { browser, proc, port, page };
 }
 
@@ -288,69 +288,81 @@ interface RealBridge {
 
 type RealWindow = { __rmtestReal: RealBridge };
 
-export async function gotoMap(page: Page): Promise<boolean> {
-  return (await page.evaluate(() => (window as unknown as RealWindow).__rmtestReal.gotoMap())) as boolean;
+/** 游戏句柄最小接口：Puppeteer Page 与 Electron webContents 适配器都满足 */
+export interface GameHandle {
+  evaluate: (pageFunction: string | Function, ...args: unknown[]) => Promise<unknown>;
 }
 
-export async function enterMapScene(page: Page): Promise<boolean> {
-  return (await page.evaluate(() => (window as unknown as RealWindow).__rmtestReal.enterMapScene())) as boolean;
+/** Puppeteer Page → GameHandle 适配（Page.evaluate 泛型签名与接口不兼容，收窄于此一处） */
+export function pageAsHandle(page: Page): GameHandle {
+  return {
+    evaluate: (fn, ...args) => page.evaluate(fn as never, ...(args as never[])),
+  };
 }
 
-export async function triggerAt(page: Page, x: number, y: number): Promise<void> {
-  await page.evaluate(
+export async function gotoMap(handle: GameHandle): Promise<boolean> {
+  return (await handle.evaluate(() => (window as unknown as RealWindow).__rmtestReal.gotoMap())) as boolean;
+}
+
+export async function enterMapScene(handle: GameHandle): Promise<boolean> {
+  return (await handle.evaluate(() => (window as unknown as RealWindow).__rmtestReal.enterMapScene())) as boolean;
+}
+
+export async function triggerAt(handle: GameHandle, x: number, y: number): Promise<void> {
+  await handle.evaluate(
     (pos: { tx: number; ty: number }) => (window as unknown as RealWindow).__rmtestReal.triggerAt(pos.tx, pos.ty),
     { tx: x, ty: y },
   );
 }
 
-export async function pressOk(page: Page): Promise<void> {
-  await page.evaluate(() => (window as unknown as RealWindow).__rmtestReal.pressOk());
+export async function pressOk(handle: GameHandle): Promise<void> {
+  await handle.evaluate(() => (window as unknown as RealWindow).__rmtestReal.pressOk());
 }
 
-export async function pressKey(page: Page, key: string): Promise<void> {
-  await page.evaluate((k) => (window as unknown as RealWindow).__rmtestReal.pressKey(k), key);
+export async function pressKey(handle: GameHandle, key: string): Promise<void> {
+  await handle.evaluate((k: string) => (window as unknown as RealWindow).__rmtestReal.pressKey(k), key);
 }
 
-export async function walkPathTo(page: Page, x: number, y: number): Promise<boolean> {
-  return (await page.evaluate(
+export async function walkPathTo(handle: GameHandle, x: number, y: number): Promise<boolean> {
+  return (await handle.evaluate(
     (pos: { x: number; y: number }) => (window as unknown as RealWindow).__rmtestReal.walkPathTo(pos.x, pos.y),
     { x, y },
   )) as boolean;
 }
 
-export async function triggerFront(page: Page, x: number, y: number, dir: "up" | "down" | "left" | "right"): Promise<void> {
-  await page.evaluate(
+export async function triggerFront(handle: GameHandle, x: number, y: number, dir: "up" | "down" | "left" | "right"): Promise<void> {
+  await handle.evaluate(
     (a: { x: number; y: number; dir: "up" | "down" | "left" | "right" }) =>
       (window as unknown as RealWindow).__rmtestReal.triggerFront(a.x, a.y, a.dir),
     { x, y, dir },
   );
 }
 
-export async function saveGame(page: Page, slot: number): Promise<boolean> {
-  return (await page.evaluate((s) => (window as unknown as RealWindow).__rmtestReal.saveGame(s), slot)) as boolean;
+export async function saveGame(handle: GameHandle, slot: number): Promise<boolean> {
+  return (await handle.evaluate((s: number) => (window as unknown as RealWindow).__rmtestReal.saveGame(s), slot)) as boolean;
 }
 
-export async function loadGame(page: Page, slot: number): Promise<boolean> {
-  return (await page.evaluate((s) => (window as unknown as RealWindow).__rmtestReal.loadGame(s), slot)) as boolean;
+export async function loadGame(handle: GameHandle, slot: number): Promise<boolean> {
+  return (await handle.evaluate((s: number) => (window as unknown as RealWindow).__rmtestReal.loadGame(s), slot)) as boolean;
 }
 
-export async function snapshotReal(page: Page): Promise<RealSnapshot> {
-  return (await page.evaluate(() => (window as unknown as RealWindow).__rmtestReal.snapshot())) as RealSnapshot;
+export async function snapshotReal(handle: GameHandle): Promise<RealSnapshot> {
+  return (await handle.evaluate(() => (window as unknown as RealWindow).__rmtestReal.snapshot())) as RealSnapshot;
 }
 
 /** 轮询快照直到条件满足或超时 */
 export async function waitForSnapshot(
-  page: Page,
+  handle: GameHandle,
   cond: (s: RealSnapshot) => boolean,
   timeoutMs = 15_000,
   intervalMs = 100,
 ): Promise<RealSnapshot> {
   const deadline = Date.now() + timeoutMs;
-  let last: RealSnapshot = await snapshotReal(page);
+  let last: RealSnapshot = await snapshotReal(handle);
   while (Date.now() < deadline) {
     if (cond(last)) return last;
     await new Promise((r) => setTimeout(r, intervalMs));
-    last = await snapshotReal(page);
+    last = await snapshotReal(handle);
   }
   return last;
 }

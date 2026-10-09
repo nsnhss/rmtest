@@ -8,7 +8,7 @@
  *
  * 录制产物是纯 DSL 场景，用 executeRealScenario 回放验证。
  */
-import type { Page } from "puppeteer-core";
+import type { GameHandle } from "./realengine.ts";
 import { ScenarioSchema, type Scenario, type ScenarioStep } from "@rmtest/dsl";
 import { pressOk, snapshotReal, triggerAt } from "./realengine.ts";
 
@@ -53,21 +53,21 @@ interface RecorderWindow {
 
 const sleepMs = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
-export async function startRecording(page: Page, opts: RecorderOptions = {}): Promise<RecordingHandle> {
-  await page.evaluate(RECORDER_SCRIPT);
-  await page.evaluate(() => {
+export async function startRecording(handle: GameHandle, opts: RecorderOptions = {}): Promise<RecordingHandle> {
+  await handle.evaluate(RECORDER_SCRIPT);
+  await handle.evaluate(() => {
     (window as unknown as RecorderWindow).__rmtestRecorder.events.length = 0;
   });
 
   // 录制从当前状态开始：场景第一帧记录当前位置
-  const start = await snapshotReal(page);
+  const start = await snapshotReal(handle);
   const steps: ScenarioStep[] = [{ type: "start_new_game" }];
   let pendingSteps = 0;
 
   const poll = async (): Promise<void> => {
     for (;;) {
       await sleepMs(50);
-      const keys = (await page.evaluate(() => {
+      const keys = (await handle.evaluate(() => {
         const w = window as unknown as RecorderWindow;
         const ev = w.__rmtestRecorder.events.splice(0);
         return ev;
@@ -78,9 +78,9 @@ export async function startRecording(page: Page, opts: RecorderOptions = {}): Pr
         const dir = DIRECTION_KEYS[key];
         if (dir) {
           // 逐键立即应用（批量只留最后一个会丢移动；连续移动在 Enter 时合并成一个 walk）
-          const s = await snapshotReal(page);
+          const s = await snapshotReal(handle);
           if (!s.eventRunning && !s.messageBusy && !s.choiceActive) {
-            await page.evaluate(
+            await handle.evaluate(
               (pos: { x: number; y: number }) => (window as unknown as RecorderWindow).__rmtestReal.setPlayer(pos.x, pos.y),
               { x: s.playerX + dir[0], y: s.playerY + dir[1] },
             );
@@ -91,22 +91,22 @@ export async function startRecording(page: Page, opts: RecorderOptions = {}): Pr
         if (key === "Enter" || key === " ") {
           // 冲掉未消费的移动（方向已被应用消费，只看累计步数）
           if (pendingSteps > 0) {
-            const s = await snapshotReal(page);
+            const s = await snapshotReal(handle);
             steps.push({ type: "walk", to: { map: s.mapId, x: s.playerX, y: s.playerY } });
             pendingSteps = 0;
           }
-          const s = await snapshotReal(page);
+          const s = await snapshotReal(handle);
           if (s.messageBusy || s.choiceActive) {
-            await pressOk(page); // 消息确认 / 确认当前选项
+            await pressOk(handle); // 消息确认 / 确认当前选项
           } else {
             steps.push({ type: "interact", direction: "up" });
-            await triggerAt(page, s.playerX, s.playerY);
+            await triggerAt(handle, s.playerX, s.playerY);
             // 事件带消息时自动确认到结束
             const deadline = Date.now() + 20_000;
             for (;;) {
-              const t = await snapshotReal(page);
+              const t = await snapshotReal(handle);
               if (!t.eventRunning && !t.messageBusy && !t.choiceActive) break;
-              if (t.messageBusy) await pressOk(page);
+              if (t.messageBusy) await pressOk(handle);
               if (t.choiceActive) break; // 选项留给后续按键
               if (Date.now() > deadline) break;
               await sleepMs(100);
@@ -122,11 +122,11 @@ export async function startRecording(page: Page, opts: RecorderOptions = {}): Pr
 
   return {
     stop: async () => {
-      await page.evaluate(() => {
+      await handle.evaluate(() => {
         (window as unknown as RecorderWindow).__rmtestRecorder.events.push("Escape");
       });
       await polling;
-      const s = await snapshotReal(page);
+      const s = await snapshotReal(handle);
       // 末尾未落地的移动补一个 walk 到当前位置（已记录过的位置不重复补）
       const moved = s.playerX !== start.playerX || s.playerY !== start.playerY;
       const alreadyRecorded = steps.some(

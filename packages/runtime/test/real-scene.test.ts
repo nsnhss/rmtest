@@ -6,6 +6,7 @@ import {
   closeRealGame,
   gotoMap,
   launchRealGame,
+  pageAsHandle,
   loadGame,
   pressOk,
   runRealEvent,
@@ -91,28 +92,28 @@ describe.skipIf(!PROJECT)("真实引擎场景级", () => {
   });
 
   it("进入地图场景：开局在地图 2", { timeout: 90_000 }, async () => {
-    const ok = await gotoMap(session.page);
+    const ok = await gotoMap(pageAsHandle(session.page));
     expect(ok).toBe(true);
-    const snap = await snapshotReal(session.page);
+    const snap = await snapshotReal(pageAsHandle(session.page));
     expect(snap.mapId).toBe(2);
     expect(snap.eventRunning).toBe(false);
   });
 
   it("触发对话事件：消息等待 → 确认 → 事件完成并置开关", { timeout: 90_000 }, async () => {
-    await triggerAt(session.page, 5, 5);
+    await triggerAt(pageAsHandle(session.page), 5, 5);
     // 事件开始运行，消息窗口出现（真实帧循环驱动）
-    const busy = await waitForSnapshot(session.page, (s) => s.eventRunning && s.messageBusy, 15_000);
+    const busy = await waitForSnapshot(pageAsHandle(session.page), (s) => s.eventRunning && s.messageBusy, 15_000);
     expect(busy.eventRunning).toBe(true);
 
-    await pressOk(session.page);
+    await pressOk(pageAsHandle(session.page));
     // 消息确认后事件走完，开关 5 置位
-    const done = await waitForSnapshot(session.page, (s) => !s.eventRunning && !s.messageBusy, 15_000);
+    const done = await waitForSnapshot(pageAsHandle(session.page), (s) => !s.eventRunning && !s.messageBusy, 15_000);
     expect(done.switches[5]).toBe(true);
   });
 
   it("存档往返：保存 → 改状态 → 读档恢复", { timeout: 90_000 }, async () => {
     // 当前开关 5 = ON，存到槽位 1
-    const saved = await saveGame(session.page, 1);
+    const saved = await saveGame(pageAsHandle(session.page), 1);
     expect(saved).toBe(true);
 
     // 手动把开关 5 关掉
@@ -120,15 +121,15 @@ describe.skipIf(!PROJECT)("真实引擎场景级", () => {
       { code: 121, indent: 0, parameters: [5, 5, 1] },
       { code: 0, indent: 0, parameters: [] },
     ]);
-    const off = await snapshotReal(session.page);
+    const off = await snapshotReal(pageAsHandle(session.page));
     expect(off.switches[5]).toBe(false);
 
     // 读档 → 回地图场景 → 开关 5 恢复 ON
-    const loaded = await loadGame(session.page, 1);
+    const loaded = await loadGame(pageAsHandle(session.page), 1);
     expect(loaded).toBe(true);
-    const entered = await enterMapScene(session.page);
+    const entered = await enterMapScene(pageAsHandle(session.page));
     expect(entered).toBe(true);
-    const restored = await waitForSnapshot(session.page, (s) => !s.transferring, 15_000);
+    const restored = await waitForSnapshot(pageAsHandle(session.page), (s) => !s.transferring, 15_000);
     expect(restored.switches[5]).toBe(true);
     expect(restored.mapId).toBe(2);
   });

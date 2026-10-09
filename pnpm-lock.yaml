@@ -262,6 +262,15 @@ importers:
       '@rmtest/cli':
         specifier: workspace:*
         version: link:../cli
+      '@rmtest/core':
+        specifier: workspace:*
+        version: link:../core
+      '@rmtest/dsl':
+        specifier: workspace:*
+        version: link:../dsl
+      '@rmtest/store':
+        specifier: workspace:*
+        version: link:../store
     devDependencies:
       '@rmtest/runtime':
         specifier: workspace:*

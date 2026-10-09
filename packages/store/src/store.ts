@@ -112,6 +112,21 @@ export class ProjectStore {
     return rows.map((r) => ({ ...r, passed: r.passed === 1 }));
   }
 
+  /** 按天聚合运行结果（回归趋势面板） */
+  trendSummary(days = 14): Array<{ day: string; passed: number; failed: number }> {
+    const rows = this.#db
+      .prepare(
+        `SELECT strftime('%Y-%m-%d', run_at / 1000, 'unixepoch', 'localtime') AS day,
+                SUM(CASE WHEN passed = 1 THEN 1 ELSE 0 END) AS passed,
+                SUM(CASE WHEN passed = 0 THEN 1 ELSE 0 END) AS failed
+         FROM results
+         WHERE run_at >= ?
+         GROUP BY day ORDER BY day DESC`,
+      )
+      .all(Date.now() - days * 24 * 3600 * 1000) as unknown as Array<{ day: string; passed: number; failed: number }>;
+    return rows;
+  }
+
   // —— golden 基线 ——
   saveBaseline(input: { tag: string; png: string; width: number; height: number }): void {
     this.#db

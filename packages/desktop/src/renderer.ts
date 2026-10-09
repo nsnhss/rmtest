@@ -33,6 +33,13 @@ interface Api {
   corpusList: (dir: string) => Promise<{ entries: Array<{ id: string; status: string; issues: string[] }>; count: number }>;
   corpusAdd: (dir: string, scenarioPath: string) => Promise<{ id: string; steps: number }>;
   regress: (dir: string) => Promise<{ passed: number; failed: number; skipped: number; details: string[] }>;
+  coverage: (dir: string) => Promise<{ total: number; covered: number; maps: Array<{ mapId: number; name: string; covered: boolean }> }>;
+  trends: (dir: string) => Promise<{ rows: Array<{ day: string; passed: number; failed: number }> }>;
+  fuzz: (dir: string, opts: { seed?: number }) => Promise<{ steps: number; novelStates: number; crashes: string[] }>;
+  goldenApprove: (dir: string, tag: string) => Promise<{ ok: boolean; tag: string }>;
+  goldenCheck: (dir: string, tag: string) => Promise<{ tag: string; diffRatio: number; comparable: boolean }>;
+  recordStart: (dir: string) => Promise<{ ok?: boolean; error?: string }>;
+  recordStop: () => Promise<{ ok?: boolean; error?: string; path?: string; steps?: number }>;
 }
 
 declare global {
@@ -178,5 +185,113 @@ byId("regressBtn").addEventListener("click", () => {
     out.textContent = [...r.details, `通过 ${r.passed} · 失败 ${r.failed} · 跳过 ${r.skipped}`].join("\n");
   }).catch((err: Error) => {
     out.textContent = `回归失败: ${err.message}`;
+  });
+});
+
+byId("coverageBtn").addEventListener("click", () => {
+  const dir = (byId("vizDir") as HTMLInputElement).value.trim();
+  const out = byId("vizResult") as HTMLPreElement;
+  if (!dir) {
+    out.textContent = "请输入工程目录";
+    return;
+  }
+  void api.coverage(dir).then((r) => {
+    const lines = [`场景覆盖: ${r.covered}/${r.total} 个可达地图`, ...r.maps.map((m) => `  ${m.covered ? "✓" : "✗"} 地图 ${m.mapId} (${m.name})`)];
+    out.textContent = lines.join("\n");
+  }).catch((err: Error) => {
+    out.textContent = `覆盖计算失败: ${err.message}`;
+  });
+});
+
+byId("trendsBtn").addEventListener("click", () => {
+  const dir = (byId("vizDir") as HTMLInputElement).value.trim();
+  const out = byId("vizResult") as HTMLPreElement;
+  if (!dir) {
+    out.textContent = "请输入工程目录";
+    return;
+  }
+  void api.trends(dir).then((r) => {
+    if (r.rows.length === 0) {
+      out.textContent = "近 14 天无回归记录";
+      return;
+    }
+    const lines = r.rows.map((row) => {
+      const bar = "▓".repeat(Math.min(row.passed + row.failed, 40));
+      return `  ${row.day}  通过 ${row.passed} · 失败 ${row.failed}  ${bar}`;
+    });
+    out.textContent = ["回归趋势（近 14 天）:", ...lines].join("\n");
+  }).catch((err: Error) => {
+    out.textContent = `趋势查询失败: ${err.message}`;
+  });
+});
+
+byId("fuzzBtn").addEventListener("click", () => {
+  const dir = (byId("dynDir") as HTMLInputElement).value.trim();
+  const seedRaw = (byId("dynArg") as HTMLInputElement).value.trim();
+  const out = byId("dynResult") as HTMLPreElement;
+  if (!dir) {
+    out.textContent = "请输入工程目录";
+    return;
+  }
+  out.textContent = "fuzz 中（真实引擎，耐心）…";
+  void api.fuzz(dir, { seed: seedRaw ? Number(seedRaw) : undefined }).then((r) => {
+    out.textContent = [`步数 ${r.steps} · 新颖状态 ${r.novelStates} · 崩溃 ${r.crashes.length}`, ...r.crashes.map((c) => `  崩溃: ${c}`)].join("\n");
+  }).catch((err: Error) => {
+    out.textContent = `fuzz 失败: ${err.message}`;
+  });
+});
+
+byId("goldenApproveBtn").addEventListener("click", () => {
+  const dir = (byId("dynDir") as HTMLInputElement).value.trim();
+  const tag = (byId("dynArg") as HTMLInputElement).value.trim() || "default";
+  const out = byId("dynResult") as HTMLPreElement;
+  if (!dir) {
+    out.textContent = "请输入工程目录";
+    return;
+  }
+  out.textContent = "截图中…";
+  void api.goldenApprove(dir, tag).then(() => {
+    out.textContent = `基线 ${tag} 已批准`;
+  }).catch((err: Error) => {
+    out.textContent = `golden 失败: ${err.message}`;
+  });
+});
+
+byId("goldenCheckBtn").addEventListener("click", () => {
+  const dir = (byId("dynDir") as HTMLInputElement).value.trim();
+  const tag = (byId("dynArg") as HTMLInputElement).value.trim() || "default";
+  const out = byId("dynResult") as HTMLPreElement;
+  if (!dir) {
+    out.textContent = "请输入工程目录";
+    return;
+  }
+  out.textContent = "对比中…";
+  void api.goldenCheck(dir, tag).then((r) => {
+    out.textContent = `基线 ${r.tag} diffRatio=${r.diffRatio.toFixed(4)}${r.comparable ? "" : "（尺寸不匹配）"}`;
+  }).catch((err: Error) => {
+    out.textContent = `golden 失败: ${err.message}`;
+  });
+});
+
+byId("recordStartBtn").addEventListener("click", () => {
+  const dir = (byId("dynDir") as HTMLInputElement).value.trim();
+  const out = byId("dynResult") as HTMLPreElement;
+  if (!dir) {
+    out.textContent = "请输入工程目录";
+    return;
+  }
+  void api.recordStart(dir).then((r) => {
+    out.textContent = r.error ?? "录制中：在游戏窗口里游玩，完成后点\"停止并保存\"（或按 Esc）";
+  }).catch((err: Error) => {
+    out.textContent = `录制启动失败: ${err.message}`;
+  });
+});
+
+byId("recordStopBtn").addEventListener("click", () => {
+  const out = byId("dynResult") as HTMLPreElement;
+  void api.recordStop().then((r) => {
+    out.textContent = r.error ?? `已保存: ${r.path}（${r.steps} 步）`;
+  }).catch((err: Error) => {
+    out.textContent = `录制停止失败: ${err.message}`;
   });
 });

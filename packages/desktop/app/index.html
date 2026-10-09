@@ -67,6 +67,26 @@
     <pre class="result" id="regressResult"></pre>
   </section>
 
+  <section>
+    <h2>覆盖与趋势（可视化）</h2>
+    <input type="text" id="vizDir" placeholder="工程目录">
+    <button id="coverageBtn">覆盖地图</button>
+    <button id="trendsBtn">回归趋势</button>
+    <pre class="result" id="vizResult"></pre>
+  </section>
+
+  <section>
+    <h2>动态测试（真实引擎）</h2>
+    <input type="text" id="dynDir" placeholder="工程目录">
+    <input type="text" id="dynArg" placeholder="golden 标签 / fuzz 种子（可选）">
+    <button id="fuzzBtn">fuzz 探索</button>
+    <button id="goldenApproveBtn">golden 批准</button>
+    <button id="goldenCheckBtn">golden 对比</button>
+    <button id="recordStartBtn">开始录制</button>
+    <button id="recordStopBtn">停止并保存</button>
+    <pre class="result" id="dynResult"></pre>
+  </section>
+
   <script src="dist/renderer.js"></script>
 </body>
 </html>

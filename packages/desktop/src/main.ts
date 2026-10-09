@@ -6,7 +6,11 @@ import { app, BrowserWindow, ipcMain } from "electron";
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { aigen, defaultProvider, contentReport, corpusAdd, corpusList, maintain, regressCli, scan } from "@rmtest/cli";
+import { aigen, contentReport, corpusAdd, corpusList, defaultProvider, fuzzCli, goldenCli, loadProjectAny, maintain, regressCli, scan } from "@rmtest/cli";
+import { scenarioMapCoverage } from "@rmtest/core";
+import { ScenarioSchema } from "@rmtest/dsl";
+import { REAL_BRIDGE, gotoMap, startRecording, type GameHandle, type RecordingHandle } from "@rmtest/runtime";
+import { ProjectStore } from "@rmtest/store";
 
 ipcMain.handle("scan", (_e, dir: string) => {
   const summary = scan(dir);
@@ -86,6 +90,88 @@ ipcMain.handle("regress", async (_e, dir: string) => {
       (i) => `[${i.outcome}] (${i.status}) ${i.scenarioId}${i.message ? ` — ${i.message}` : ""}`,
     ),
   };
+});
+
+ipcMain.handle("coverage", (_e, dir: string) => {
+  const { project } = loadProjectAny(dir);
+  const store = new ProjectStore(path.join(dir, "rmtest.db"));
+  const scenarios = store.listScenarios().map((s) => ScenarioSchema.parse(JSON.parse(s.json)));
+  store.close();
+  return scenarioMapCoverage(project.ir, scenarios);
+});
+
+ipcMain.handle("trends", (_e, dir: string) => {
+  const store = new ProjectStore(path.join(dir, "rmtest.db"));
+  const rows = store.trendSummary(14);
+  store.close();
+  return { rows };
+});
+
+ipcMain.handle("fuzz", async (_e, dir: string, opts: { maxSteps?: number; timeBudgetMs?: number; seed?: number }) => {
+  const result = await fuzzCli(dir, opts);
+  return { steps: result.steps, novelStates: result.novelStates, crashes: result.crashes };
+});
+
+ipcMain.handle("golden-approve", async (_e, dir: string, tag: string) => {
+  await goldenCli(dir, tag, "approve");
+  return { ok: true, tag };
+});
+
+ipcMain.handle("golden-check", async (_e, dir: string, tag: string) => {
+  const r = await goldenCli(dir, tag, "check");
+  return { tag: r.tag, diffRatio: r.diffRatio, comparable: r.comparable };
+});
+
+// —— 录制：可见游戏窗口，用户真实游玩，键盘捕获 → DSL 场景 ——
+let activeRecording: { handle: RecordingHandle; dir: string; win: BrowserWindow } | null = null;
+
+ipcMain.handle("record-start", async (_e, dir: string) => {
+  if (activeRecording) return { error: "已有录制会话在运行" };
+  const url = pathToFileURL(path.join(dir, "index.html")).href;
+  const win = new BrowserWindow({ width: 816, height: 624, webPreferences: { contextIsolation: true, sandbox: true } });
+  await win.loadURL(url);
+  await win.webContents.executeJavaScript(REAL_BRIDGE);
+
+  const adapter: GameHandle = {
+    evaluate: (fn, ...args) =>
+      win.webContents.executeJavaScript(
+        `(${fn.toString()})(${args.map((a) => JSON.stringify(a)).join(",")})`,
+      ) as Promise<unknown>,
+  };
+
+  const deadline = Date.now() + 30_000;
+  let ready = false;
+  while (Date.now() < deadline) {
+    ready = (await adapter.evaluate(
+      () => (window as never as { __rmtestReal?: { ready: () => boolean } }).__rmtestReal!.ready(),
+    )) as boolean;
+    if (ready) break;
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  if (!ready) {
+    win.close();
+    return { error: "游戏引擎启动超时" };
+  }
+  const entered = await gotoMap(adapter);
+  if (!entered) {
+    win.close();
+    return { error: "进入地图场景失败" };
+  }
+
+  const handle = await startRecording(adapter, { scenarioId: `rec-${Date.now()}` });
+  activeRecording = { handle, dir, win };
+  return { ok: true };
+});
+
+ipcMain.handle("record-stop", async () => {
+  if (!activeRecording) return { error: "无录制会话" };
+  const { handle, dir, win } = activeRecording;
+  activeRecording = null;
+  const scenario = await handle.stop();
+  const outPath = path.join(dir, "recorded-scenario.json");
+  writeFileSync(outPath, JSON.stringify(scenario, null, 2));
+  win.close();
+  return { ok: true, path: outPath, steps: scenario.steps.length };
 });
 
 app.whenReady().then(() => {

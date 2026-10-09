@@ -14,7 +14,7 @@
     "spike:mv": "tsx packages/adapters/mv/spike/parse.ts",
     "spike:runtime": "tsx packages/runtime/spike/run.ts",
     "scan": "tsx packages/cli/src/main.ts",
-    "desktop:build": "esbuild packages/desktop/src/main.ts --bundle --platform=node --format=cjs --external:electron --outfile=packages/desktop/dist/main.cjs && esbuild packages/desktop/src/renderer.ts --bundle --format=iife --outfile=packages/desktop/app/dist/renderer.js",
+    "desktop:build": "esbuild packages/desktop/src/main.ts --bundle --platform=node --format=esm --external:electron --banner:js=\"import { createRequire as __rmtestShimCreateRequire } from 'node:module'; import { fileURLToPath as __rmtestFileURLToPath } from 'node:url'; const require = __rmtestShimCreateRequire(import.meta.url); const __dirname = __rmtestFileURLToPath(new URL('.', import.meta.url));\" --outfile=packages/desktop/dist/main.mjs && esbuild packages/desktop/src/renderer.ts --bundle --format=iife --outfile=packages/desktop/app/dist/renderer.js",
     "desktop": "pnpm desktop:build && pnpm exec electron packages/desktop"
   },
   "devDependencies": {

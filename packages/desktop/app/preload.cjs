@@ -9,4 +9,11 @@ contextBridge.exposeInMainWorld("api", {
   corpusList: (dir) => ipcRenderer.invoke("corpus-list", dir),
   corpusAdd: (dir, scenarioPath) => ipcRenderer.invoke("corpus-add", dir, scenarioPath),
   regress: (dir) => ipcRenderer.invoke("regress", dir),
+  coverage: (dir) => ipcRenderer.invoke("coverage", dir),
+  trends: (dir) => ipcRenderer.invoke("trends", dir),
+  fuzz: (dir, opts) => ipcRenderer.invoke("fuzz", dir, opts),
+  goldenApprove: (dir, tag) => ipcRenderer.invoke("golden-approve", dir, tag),
+  goldenCheck: (dir, tag) => ipcRenderer.invoke("golden-check", dir, tag),
+  recordStart: (dir) => ipcRenderer.invoke("record-start", dir),
+  recordStop: () => ipcRenderer.invoke("record-stop"),
 });

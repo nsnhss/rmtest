@@ -8,6 +8,7 @@ import {
   gotoMap,
   launchRealGame,
   snapshotReal,
+  pageAsHandle,
   startRecording,
   waitGameReady,
   type RealGameSession,
@@ -83,9 +84,9 @@ describe.skipIf(!PROJECT)("录制器（键盘捕获 → DSL 场景）", () => {
   });
 
   it("录制会话 → 回放验证（录制即场景）", { timeout: 180_000 }, async () => {
-    await gotoMap(session.page);
+    await gotoMap(pageAsHandle(session.page));
 
-    const recording = await startRecording(session.page, { scenarioId: "rec-1" });
+    const recording = await startRecording(pageAsHandle(session.page), { scenarioId: "rec-1" });
 
     const key = async (k: string) => {
       await session.page.evaluate((keyName) => {
@@ -111,11 +112,11 @@ describe.skipIf(!PROJECT)("录制器（键盘捕获 → DSL 场景）", () => {
     expect(walk).toMatchObject({ type: "walk", to: { map: 2, x: 5, y: 5 } });
 
     // 事件已把开关 5 置位（录制期间真实执行了）
-    const snap = await snapshotReal(session.page);
+    const snap = await snapshotReal(pageAsHandle(session.page));
     expect(snap.switches[5]).toBe(true);
 
     // 回放：重开新游戏 → 加断言 → 跑录制场景 → 通过
-    await gotoMap(session.page);
+    await gotoMap(pageAsHandle(session.page));
     scenario.steps.push({ type: "assert_switch", switchId: 5, value: true });
     const result = await executeRealScenario(session.page, scenario);
     expect(result.passed).toBe(true);

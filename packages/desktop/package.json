@@ -3,9 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "main": "dist/main.cjs",
+  "main": "dist/main.mjs",
   "dependencies": {
-    "@rmtest/cli": "workspace:*"
+    "@rmtest/cli": "workspace:*",
+    "@rmtest/core": "workspace:*",
+    "@rmtest/dsl": "workspace:*",
+    "@rmtest/store": "workspace:*"
   },
   "devDependencies": {
     "@rmtest/runtime": "workspace:*"

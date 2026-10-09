@@ -10,6 +10,7 @@ import {
   compareGolden,
   gotoMap,
   launchRealGame,
+  pageAsHandle,
   takeScreenshot,
   waitGameReady,
 } from "@rmtest/runtime";
@@ -37,7 +38,7 @@ export async function goldenCli(
   const session = await launchRealGame(projectDir, { electronPath: electronExe });
   try {
     await waitGameReady(session.page);
-    const entered = await gotoMap(session.page);
+    const entered = await gotoMap(pageAsHandle(session.page));
     if (!entered) throw new Error("进入地图场景失败");
     const shot = await takeScreenshot(session.page, { tag });
 

@@ -5,7 +5,8 @@
 import { Cmd, type IRDocument } from "../ir.ts";
 import { walkCommands } from "../walk.ts";
 
-export function reachablePageKeys(ir: IRDocument): string[] {
+/** 可达地图 ID 全集：从开局地图沿传送图 BFS（地图级，不依赖事件页） */
+export function reachableMapIds(ir: IRDocument): Set<number> {
   const edges = new Map<number, number[]>();
   for (const m of ir.maps) edges.set(m.id, []);
   for (const m of ir.maps) {
@@ -30,6 +31,11 @@ export function reachablePageKeys(ir: IRDocument): string[] {
     visited.add(id);
     queue.push(...(edges.get(id) ?? []));
   }
+  return visited;
+}
+
+export function reachablePageKeys(ir: IRDocument): string[] {
+  const visited = reachableMapIds(ir);
 
   const keys: string[] = [];
   for (const m of ir.maps) {

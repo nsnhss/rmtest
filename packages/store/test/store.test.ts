@@ -61,4 +61,15 @@ describe("项目库", () => {
     expect(store.getGameFingerprint()).toBe("abc");
     store.close();
   });
+
+  it("趋势聚合：按天统计通过/失败", () => {
+    const store = new ProjectStore(":memory:");
+    store.recordResult({ scenarioId: "a", passed: true, stepResultsJson: "[]", snapshotJson: "{}" });
+    store.recordResult({ scenarioId: "a", passed: false, stepResultsJson: "[]", snapshotJson: "{}" });
+    store.recordResult({ scenarioId: "a", passed: true, stepResultsJson: "[]", snapshotJson: "{}" });
+    const trends = store.trendSummary(14);
+    expect(trends).toHaveLength(1);
+    expect(trends[0]).toMatchObject({ passed: 2, failed: 1 });
+    store.close();
+  });
 });

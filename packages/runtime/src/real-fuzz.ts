@@ -4,7 +4,7 @@
  */
 import type { Page } from "puppeteer-core";
 import { mulberry32 } from "./fuzz.ts";
-import { pressOk, snapshotReal, triggerAt, type RealSnapshot } from "./realengine.ts";
+import { pageAsHandle, pressOk, snapshotReal, triggerAt, type RealSnapshot } from "./realengine.ts";
 
 export interface RealFuzzOptions {
   maxSteps: number;
@@ -56,9 +56,9 @@ export async function fuzzRealGame(page: Page, opts: RealFuzzOptions): Promise<R
         },
         { x, y },
       );
-      await triggerAt(page, x, y);
-      if (press) await pressOk(page);
-      const s = await snapshotReal(page);
+      await triggerAt(pageAsHandle(page), x, y);
+      if (press) await pressOk(pageAsHandle(page));
+      const s = await snapshotReal(pageAsHandle(page));
       dims = { w: s.dataMapWidth || DEFAULT_W, h: s.dataMapHeight || DEFAULT_H };
       const key = stateKey(s);
       steps++;
@@ -72,7 +72,7 @@ export async function fuzzRealGame(page: Page, opts: RealFuzzOptions): Promise<R
     }
   }
 
-  return { steps, novelStates: novel, crashes, finalSnapshot: await snapshotReal(page) };
+  return { steps, novelStates: novel, crashes, finalSnapshot: await snapshotReal(pageAsHandle(page)) };
 }
 
 // 供 CLI 复用的随机源

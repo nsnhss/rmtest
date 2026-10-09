@@ -20,9 +20,12 @@ beforeAll(async () => {
     entryPoints: [path.join(APP_DIR, "src", "main.ts")],
     bundle: true,
     platform: "node",
-    format: "cjs",
+    format: "esm",
     external: ["electron"],
-    outfile: path.join(APP_DIR, "dist", "main.cjs"),
+    banner: {
+      js: "import { createRequire as __rmtestShimCreateRequire } from 'node:module'; import { fileURLToPath as __rmtestFileURLToPath } from 'node:url'; const require = __rmtestShimCreateRequire(import.meta.url); const __dirname = __rmtestFileURLToPath(new URL('.', import.meta.url));",
+    },
+    outfile: path.join(APP_DIR, "dist", "main.mjs"),
   });
   await build({
     entryPoints: [path.join(APP_DIR, "src", "renderer.ts")],
@@ -113,5 +116,28 @@ describe("桌面 UI 冒烟", () => {
 
     const text = await page.evaluate(() => document.getElementById("corpusResult")!.textContent!);
     expect(text).toContain("语料 0 个场景");
+  });
+
+  it("覆盖地图按钮 → 报出可达地图覆盖", { timeout: 120_000 }, async () => {
+    await page.evaluate((dir) => {
+      (document.getElementById("vizDir") as HTMLInputElement).value = dir;
+    }, projectDir!);
+    await page.click("#coverageBtn");
+    await page.waitForFunction(() => (document.getElementById("vizResult")?.textContent ?? "").includes("场景覆盖"), { timeout: 90_000 });
+
+    const text = await page.evaluate(() => document.getElementById("vizResult")!.textContent!);
+    expect(text).toContain("场景覆盖: 0/2");
+    expect(text).toContain("✗ 地图 1");
+  });
+
+  it("回归趋势按钮 → 无记录提示", { timeout: 120_000 }, async () => {
+    await page.evaluate((dir) => {
+      (document.getElementById("vizDir") as HTMLInputElement).value = dir;
+    }, projectDir!);
+    await page.click("#trendsBtn");
+    await page.waitForFunction(() => (document.getElementById("vizResult")?.textContent ?? "").includes("回归记录"), { timeout: 90_000 });
+
+    const text = await page.evaluate(() => document.getElementById("vizResult")!.textContent!);
+    expect(text).toContain("近 14 天无回归记录");
   });
 });

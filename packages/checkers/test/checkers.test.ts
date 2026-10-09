@@ -331,6 +331,25 @@ describe("checkers v1", () => {
     }
   });
 
+  it("星号瓦片（0x10）视为不可走 → 传送软锁", () => {
+    const p = buildProject(fullAssets());
+    try {
+      p.writeJson("Tilesets.json", (d) => {
+        const arr = d as unknown as Array<Record<string, unknown> | null>;
+        arr[1]!["flags"] = [0, 16]; // tile 1 = 星号（水面类）
+      });
+      p.writeJson("Map002.json", (d) => {
+        const data = d["data"] as unknown[];
+        data[2 * 5 + 2] = 1; // (2,2) 换成星号瓦片
+      });
+      const sections = run(p.loaded()).sections;
+      const hit = sections.filter((s) => s.type === "transfer-softlock" && s.message.includes("不可走"));
+      expect(hit).toHaveLength(1);
+    } finally {
+      p.destroy();
+    }
+  });
+
   it("插件抛异常 → 记录错误，其余检查器照跑（内核隔离）", () => {
     const p = buildProject(fullAssets());
     try {

@@ -180,9 +180,20 @@ class Reader {
 
   parseUserDefined(): { $user: string; $bytes: Uint8Array } {
     const cls = this.parseValue();
-    const bytes = this.#buf.subarray(this.#pos); // 剩余全部（UserDefined 无法知道边界）
-    this.#pos = this.#buf.length;
-    return { $user: symbolOf(cls), $bytes: bytes };
+    const className = symbolOf(cls);
+    if (className === "Table") {
+      // Table._dump：头 20 字节（5×int32）内含 count → 精确消费
+      const header = this.#buf.subarray(this.#pos, this.#pos + 20);
+      this.#pos += 20;
+      const count = header[16]! | (header[17]! << 8) | (header[18]! << 16) | (header[19]! << 24);
+      const data = this.#buf.subarray(this.#pos, this.#pos + count * 2);
+      this.#pos += count * 2;
+      const bytes = new Uint8Array(header.length + data.length);
+      bytes.set(header, 0);
+      bytes.set(data, header.length);
+      return { $user: className, $bytes: bytes };
+    }
+    throw new Error(`不支持 UserDefined 类 ${className}`);
   }
 }
 

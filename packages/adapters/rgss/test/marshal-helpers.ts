@@ -40,6 +40,9 @@ export function encodeMarshal(v: unknown): Uint8Array {
       for (const item of val) enc(item);
     } else if (typeof val === "object" && "$sym" in (val as object)) {
       bytes.push(0x3a, ...long((val as { $sym: string }).$sym.length), ...new TextEncoder().encode((val as { $sym: string }).$sym));
+    } else if (typeof val === "object" && "$user" in (val as object)) {
+      const { $user } = val as { $user: { cls: string; bytes: number[] } };
+      bytes.push(0x55, 0x3a, ...long($user.cls.length), ...new TextEncoder().encode($user.cls), ...$user.bytes);
     } else if (typeof val === "object" && "$obj" in (val as object)) {
       const { $obj } = val as { $obj: { cls: string; ivars: Record<string, unknown> } };
       bytes.push(0x6f, 0x3a, ...long($obj.cls.length), ...new TextEncoder().encode($obj.cls));

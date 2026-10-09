@@ -7,6 +7,18 @@ const sym = (s: string) => ({ $sym: s });
 const obj = (cls: string, ivars: Record<string, unknown>) => ({ $obj: { cls, ivars } });
 const hash = (pairs: Array<[unknown, unknown]>) => ({ $hash: pairs });
 
+/** VX Ace Table 字节：头 5×int32（dims,xsize,ysize,zsize,count）+ int16 LE 数据 */
+function table(data: number[]): unknown {
+  const bytes: number[] = [];
+  const i32 = (v: number) => [v & 0xff, (v >> 8) & 0xff, (v >> 16) & 0xff, (v >> 24) & 0xff];
+  bytes.push(...i32(1), ...i32(data.length), ...i32(1), ...i32(1), ...i32(data.length));
+  for (const v of data) {
+    const u = v < 0 ? v + 0x10000 : v;
+    bytes.push(u & 0xff, (u >> 8) & 0xff);
+  }
+  return { $user: { cls: "Table", bytes } };
+}
+
 /** 构造最小 VX Ace 工程数据（合成 Marshal 字节） */
 function buildFixture(): Record<string, Uint8Array> {
   const files: Record<string, Uint8Array> = {};
@@ -64,9 +76,21 @@ function buildFixture(): Record<string, Uint8Array> {
       "@height": 4,
       "@tileset_id": 1,
       "@parallax_name": "",
+      // 三层数据：地面层 = 全 1，其余层 0
+      "@data": table([...new Array(20).fill(1), ...new Array(40).fill(0)]),
       "@events": hash([[1, event]]),
     }),
   );
+
+  files["Tilesets.rvdata2"] = encodeMarshal([
+    null,
+    obj("RPG::Tileset", {
+      "@id": 1,
+      "@name": "野外",
+      "@tileset_names": [null, "A1", "A2", "A3", "A4", "A5", "B", "C", "D", "E"],
+      "@flags": table([0, 16]), // tile 0 可走，tile 1 星号（不可走）
+    }),
+  ]);
 
   files["Actors.rvdata2"] = encodeMarshal([
     null,
@@ -127,5 +151,12 @@ describe("RGSS 数据 → IR", () => {
     expect(ir.troops[0]!.enemyIds).toEqual([1]);
     expect(ir.enemies[0]!.battlerName).toBe("Goblin");
     expect(ir.classes[0]!.name).toBe("战士");
+  });
+
+  it("Table 解码：图块 flags 与地图地面层", () => {
+    expect(ir.tilesets[0]!.flags.slice(0, 2)).toEqual([0, 16]);
+    // 三层数据取地面层：20 格全 1
+    expect(ir.maps[0]!.data).toHaveLength(20);
+    expect(ir.maps[0]!.data[0]).toBe(1);
   });
 });

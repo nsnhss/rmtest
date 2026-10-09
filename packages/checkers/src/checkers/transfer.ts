@@ -10,10 +10,12 @@ import { walkCommands } from "@rmtest/core";
 
 const BLOCKED = 0xf;
 
-/** 四向阻挡位：0x1 下 0x2 左 0x4 右 0x8 上 */
+/** 四向阻挡位：0x1 下 0x2 左 0x4 右 0x8 上；0x10 = 星号（通行无关，视为不可走） */
 function passable(flags: number[], tileId: number): boolean | null {
   if (tileId < 0 || tileId >= flags.length) return null;
-  return (flags[tileId]! & BLOCKED) !== BLOCKED;
+  const flag = flags[tileId]!;
+  if ((flag & 0x10) !== 0) return false;
+  return (flag & BLOCKED) !== BLOCKED;
 }
 
 function flagsFor(ir: IRDocument, map: IRMap): number[] {

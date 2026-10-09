@@ -126,6 +126,26 @@ function parsePages(raw: MarshalValue | undefined): IREventPage[] {
   return pages;
 }
 
+/** VX Ace Table（UserDefined "Table"）解码：头 5×int32（dims,xsize,ysize,zsize,count）+ count×int16 LE */
+function decodeTable(raw: MarshalValue | undefined): number[] | null {
+  if (!raw || typeof raw !== "object" || !("$user" in (raw as object))) return null;
+  const u = raw as { $user?: string; $bytes?: Uint8Array };
+  if (u.$user !== "Table" || !u.$bytes) return null;
+  const bytes = u.$bytes;
+  if (bytes.length < 20) return null;
+  const readI32 = (off: number) => (bytes[off]! | (bytes[off + 1]! << 8) | (bytes[off + 2]! << 16) | (bytes[off + 3]! << 24)) | 0;
+  const count = readI32(16);
+  if (bytes.length < 20 + count * 2) return null;
+  const out: number[] = [];
+  for (let i = 0; i < count; i++) {
+    const off = 20 + i * 2;
+    let v = bytes[off]! | (bytes[off + 1]! << 8);
+    if (v >= 0x8000) v -= 0x10000; // int16 符号扩展
+    out.push(v);
+  }
+  return out;
+}
+
 export function parseData(files: Record<string, Uint8Array>): ParseResult {
   const warnings: string[] = [];
   const parsed: Record<string, MarshalValue> = {};
@@ -175,13 +195,15 @@ export function parseData(files: Record<string, Uint8Array>): ParseResult {
         pages: parsePages(iv(ev, "@pages")),
       });
     }
+    const mapData = decodeTable(iv(map, "@data")) ?? [];
+    const layerSize = mapData.length > 0 ? mapData.length / 3 : 0;
     maps.push({
       id,
       name: strValue(info ? iv(info, "@name") : undefined),
       width: numValue(iv(map, "@width")),
       height: numValue(iv(map, "@height")),
       tilesetId: numValue(iv(map, "@tileset_id")),
-      data: [], // Table 原始数据暂不解析（软锁检查按 flags 缺失跳过）
+      data: mapData.slice(0, layerSize), // 三层中的地面层（其余层与软锁检查无关）
       parallaxName: strValue(iv(map, "@parallax_name")),
       bgmName: (() => {
         const bgm = asObj(iv(map, "@autoplay_bgm") ? iv(map, "@bgm") : undefined);
@@ -254,7 +276,7 @@ export function parseData(files: Record<string, Uint8Array>): ParseResult {
       id: numValue(iv(t, "@id")),
       name: strValue(iv(t, "@name")),
       imageNames: (asArray(iv(t, "@tileset_names")) ?? []).map((n) => strValue(n)),
-      flags: [], // Table 暂不解析
+      flags: decodeTable(iv(t, "@flags")) ?? [],
     });
   }
 

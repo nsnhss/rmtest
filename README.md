@@ -19,7 +19,20 @@
 | 插件生态 | 用户自写 checker 文件级分发，`loadCheckersFromDir` 动态加载，坏插件隔离 |
 | 桌面应用 | `pnpm desktop`：扫描/维护/内容/AI 生成/场景库/运行中心/覆盖趋势/动态测试(fuzz/golden/录制) 全视图 |
 
-**测试：207 个，全部通过**（`pnpm test`；含 14 个真实引擎验证测试，设置 `RM_REAL_PROJECT` 指向你的 MV/MZ 工程即启用）；类型检查 `pnpm typecheck`。
+**测试：237 个，全部通过**（`pnpm test`；含 14 个真实引擎验证测试，设置 `RM_REAL_PROJECT` 指向你的 MV/MZ 工程即启用）；类型检查 `pnpm typecheck`。
+
+### 测试体系
+
+| 层 | 内容 | 位置 |
+|---|---|---|
+| 单元 | core 事实/IR 契约、DSL 校验、freshness 重链、store、refgraph 全命令扫描 | `packages/core|dsl|freshness|store/test` |
+| 集成 | 6 引擎检查器 × 适配器全链路（合成工程 → 加载 → 检查） | `packages/checkers|adapters/*/test` |
+| 接口 | CLI 全部命令函数级 + 入口黑盒（真实进程 spawn：参数分派/退出码/错误路径）；包 API 导出契约 | `packages/cli/test` |
+| 性能 | 300 地图 × 10 事件工程全量扫描（<1s，RSS +40MB）、增量无变更跳过、RM2k 大地图二进制解析 | `packages/cli/test/perf.test.ts` |
+| 健壮性 | 损坏/截断 LCF 输入、BER 溢出、伪随机字节全量遍历不崩溃 | `packages/adapters/rm2k/test/robust.test.ts` |
+| E2E | 真实 MV 引擎 14 项（run/fuzz/golden/录制/回归）+ 桌面应用（UI 冒烟 + fuzz/golden/录制按钮真实引擎） | `packages/runtime|desktop/test`（env 门控） |
+
+覆盖率：`pnpm coverage`——行 72.8% / 分支 60.2%（含真实引擎 E2E 时）。桌面主进程与页面内执行代码因打包/跨上下文执行，覆盖率不归因回源（测量伪影，非测试缺口）。
 
 ## 快速开始
 

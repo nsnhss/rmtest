@@ -5,5 +5,17 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
+  },
+  "devDependencies": {
+    "@rmtest/adapter-gbs": "workspace:*",
+    "@rmtest/adapter-godot": "workspace:*",
+    "@rmtest/adapter-mv": "workspace:*",
+    "@rmtest/adapter-rgss": "workspace:*",
+    "@rmtest/adapter-rm2k": "workspace:*",
+    "@rmtest/adapter-tyrano": "workspace:*",
+    "@rmtest/checkers": "workspace:*",
+    "@rmtest/dsl": "workspace:*",
+    "@rmtest/report": "workspace:*",
+    "@rmtest/runtime": "workspace:*"
   }
 }

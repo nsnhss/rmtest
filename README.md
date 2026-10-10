@@ -40,6 +40,10 @@ pnpm corpus ./你的MV工程 add ./场景.json        # 场景入库
 pnpm regress ./你的MV工程                       # 一键回归
 pnpm deploy ./你的部署产物目录                   # 部署验收
 pnpm desktop                                    # 桌面应用
+
+# 网络受限时的备用推送（走 api.github.com，不依赖 git 协议连通性）
+GITHUB_TOKEN=ghp_xxx node scripts/push-via-api.mjs            # 推送本地未推送的提交
+GITHUB_TOKEN=ghp_xxx node scripts/push-via-api.mjs --dry-run  # 只列出待推送文件
 ```
 
 语料 JSON 格式（场景 DSL）示例：

@@ -44,14 +44,6 @@ export class LcfReader {
     return 0;
   }
 
-  readInt16(): number {
-    const lo = this.buf[this.pos++];
-    const hi = this.buf[this.pos++];
-    if (lo === undefined || hi === undefined) return 0;
-    const v = lo | (hi << 8);
-    return v >= 0x8000 ? v - 0x10000 : v;
-  }
-
   /** UTF-8 优先，非法序列回退 latin1（2k/2k3 本地代码页字节保底不丢） */
   readString(len: number): string {
     const bytes = this.buf.subarray(this.pos, this.pos + len);
@@ -63,12 +55,6 @@ export class LcfReader {
       for (const b of bytes) out += String.fromCharCode(b);
       return out;
     }
-  }
-
-  readBytes(len: number): Uint8Array {
-    const bytes = this.buf.subarray(this.pos, this.pos + len);
-    this.pos += len;
-    return bytes;
   }
 
   /** 结构块：id → (载荷长度) => void；未知 id 跳过；id=0 终止 */

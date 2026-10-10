@@ -108,7 +108,7 @@ export interface ParsedLmt {
 /** LMT = 头字符串("LcfMapTree") + maps 向量 + tree_order + active_node + start */
 export function parseLmt(bytes: Uint8Array): ParsedLmt {
   const r = new LcfReader(bytes);
-  const header = r.readString(r.readInt());
+  r.readString(r.readInt()); // 头字符串（"LcfMapTree"，消费帧）
   const maps: IRRm2kMapInfo[] = [];
   const count = r.readInt();
   for (let i = 0; i < count; i++) {
@@ -118,9 +118,6 @@ export function parseLmt(bytes: Uint8Array): ParsedLmt {
   for (let i = 0; i < treeOrderCount; i++) r.readInt();
   r.readInt(); // active_node
   const start = readStart(r);
-  if (header !== "LcfMapTree" && header.length !== 0) {
-    // 头名不符仍尽力解析（liblcf 也仅警告）
-  }
   return { maps, start };
 }
 

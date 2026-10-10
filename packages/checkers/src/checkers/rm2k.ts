@@ -254,13 +254,11 @@ export const rm2kMapTreeChecker: CheckerPlugin = {
     const visited = new Set<number>();
     for (const info of t.mapTree) {
       if (info.type !== 1) continue;
-      const chain: number[] = [];
       let cur: number | undefined = info.id;
       let steps = 0;
       while (cur !== undefined && cur !== 0 && steps < t.mapTree.length + 1) {
         if (visited.has(cur)) break;
         visited.add(cur);
-        chain.push(cur);
         const parent = treeIds.get(cur);
         cur = parent?.parent;
         steps++;
@@ -275,7 +273,6 @@ export const rm2kMapTreeChecker: CheckerPlugin = {
           ),
         );
       }
-      void chain;
     }
     return out;
   },

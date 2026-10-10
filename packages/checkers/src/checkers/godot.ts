@@ -252,7 +252,6 @@ export const godotNodePathChecker: CheckerPlugin = {
           const segs = pathStr.split("/").filter((s) => s.length > 0);
           let cur = nodePath;
           let unresolved = false;
-          let crossedInstance = false;
           for (let i = 0; i < segs.length; i++) {
             const seg = segs[i]!;
             if (seg === "..") {
@@ -271,8 +270,7 @@ export const godotNodePathChecker: CheckerPlugin = {
               break;
             }
             if (child.instanceRefId !== null && i < segs.length - 1) {
-              crossedInstance = true; // 剩余段在实例化的子场景里，静态不可查
-              break;
+              break; // 剩余段在实例化的子场景里，静态不可查 → 跳过不报
             }
             cur = child.path;
           }
@@ -286,7 +284,6 @@ export const godotNodePathChecker: CheckerPlugin = {
               ),
             );
           }
-          void crossedInstance;
         }
       }
     }

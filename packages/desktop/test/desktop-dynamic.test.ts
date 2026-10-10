@@ -32,6 +32,7 @@ beforeAll(async () => {
       js: "import { createRequire as __rmtestShimCreateRequire } from 'node:module'; import { fileURLToPath as __rmtestFileURLToPath } from 'node:url'; const require = __rmtestShimCreateRequire(import.meta.url); const __dirname = __rmtestFileURLToPath(new URL('.', import.meta.url));",
     },
     outfile: path.join(APP_DIR, "dist", "main.mjs"),
+    sourcemap: "inline",
   });
   await build({
     entryPoints: [path.join(APP_DIR, "src", "renderer.ts")],

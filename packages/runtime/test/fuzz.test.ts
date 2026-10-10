@@ -41,4 +41,20 @@ describe("fuzz 探索器", () => {
     expect(r.crashes).toEqual([]);
     expect(r.coverage.pages["1:2:2:0"] ?? 0).toBeGreaterThan(0);
   });
+
+  it("游戏抛异常 → 捕获进 crashes 并终止", async () => {
+    await fx.page.evaluate(() => {
+      const game = (window as unknown as { __game: { walk: () => void; interact: () => void } }).__game;
+      game.walk = () => {
+        throw new Error("boom");
+      };
+      game.interact = () => {
+        throw new Error("boom");
+      };
+    });
+    const r = await fuzzGame(fx.page, { timeBudgetMs: 5_000, maxSteps: 10, seed: 1 });
+    expect(r.crashes).toHaveLength(1);
+    expect(r.crashes[0]).toContain("boom");
+    expect(r.steps).toBe(0); // 首步即崩，计数不推进
+  });
 });

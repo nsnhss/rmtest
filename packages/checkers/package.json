@@ -12,6 +12,7 @@
   "devDependencies": {
     "@rmtest/adapter-mv": "workspace:*",
     "@rmtest/adapter-tyrano": "workspace:*",
-    "@rmtest/adapter-gbs": "workspace:*"
+    "@rmtest/adapter-gbs": "workspace:*",
+    "@rmtest/adapter-godot": "workspace:*"
   }
 }

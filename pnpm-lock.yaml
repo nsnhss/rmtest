@@ -197,6 +197,12 @@ importers:
         specifier: workspace:*
         version: link:../../core
 
+  packages/adapters/godot:
+    dependencies:
+      '@rmtest/core':
+        specifier: workspace:*
+        version: link:../../core
+
   packages/adapters/mv:
     dependencies:
       '@rmtest/core':
@@ -233,6 +239,9 @@ importers:
       '@rmtest/adapter-gbs':
         specifier: workspace:*
         version: link:../adapters/gbs
+      '@rmtest/adapter-godot':
+        specifier: workspace:*
+        version: link:../adapters/godot
       '@rmtest/adapter-mv':
         specifier: workspace:*
         version: link:../adapters/mv
@@ -245,6 +254,9 @@ importers:
       '@rmtest/adapter-gbs':
         specifier: workspace:*
         version: link:../adapters/gbs
+      '@rmtest/adapter-godot':
+        specifier: workspace:*
+        version: link:../adapters/godot
       '@rmtest/adapter-mv':
         specifier: workspace:*
         version: link:../adapters/mv

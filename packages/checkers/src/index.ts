@@ -12,6 +12,7 @@ import { firstRunFalseChecker } from "./checkers/first-run-false.ts";
 import { textOverflowChecker } from "./checkers/text-overflow.ts";
 import { tyranoCheckers } from "./checkers/tyrano.ts";
 import { gbsCheckers } from "./checkers/gbs.ts";
+import { godotCheckers } from "./checkers/godot.ts";
 
 export const checkers: CheckerPlugin[] = [
   danglingRefChecker,
@@ -29,6 +30,7 @@ export const checkers: CheckerPlugin[] = [
   firstRunFalseChecker,
   ...tyranoCheckers(),
   ...gbsCheckers(),
+  ...godotCheckers(),
 ];
 
 export { danglingRefChecker, assetDimensionChecker, faceIndexChecker, iconIndexChecker, pictureOffscreenChecker, pictureNoEraseChecker, textOverflowChecker };
@@ -47,4 +49,11 @@ export {
   gbsMissingAssetChecker,
   gbsStartSceneChecker,
 } from "./checkers/gbs.ts";
+export {
+  godotBrokenProjectConfigChecker,
+  godotConnectionMethodChecker,
+  godotMissingResourceChecker,
+  godotNodePathChecker,
+  godotSceneCycleChecker,
+} from "./checkers/godot.ts";
 export * from "./loader.ts";

@@ -8,9 +8,10 @@ import { loadProject as loadMv, type LoadedProject as MvProject } from "@rmtest/
 import { loadProject as loadRgss, type LoadedProject as RgssProject } from "@rmtest/adapter-rgss";
 import { loadProject as loadTyrano, type LoadedProject as TyranoProject } from "@rmtest/adapter-tyrano";
 import { findProjectFile as findGbsProjectFile, loadProject as loadGbs, type LoadedProject as GbsProject } from "@rmtest/adapter-gbs";
+import { loadProject as loadGodot, type LoadedProject as GodotProject } from "@rmtest/adapter-godot";
 
-export type EngineKind = "mv" | "rgss" | "tyrano" | "gbs";
-export type AnyLoadedProject = MvProject | RgssProject | TyranoProject | GbsProject;
+export type EngineKind = "mv" | "rgss" | "tyrano" | "gbs" | "godot";
+export type AnyLoadedProject = MvProject | RgssProject | TyranoProject | GbsProject | GodotProject;
 
 export function detectEngine(dir: string): EngineKind {
   const markers = [
@@ -30,6 +31,8 @@ export function detectEngine(dir: string): EngineKind {
   }
   // GB Studio：project.gbsproj 或根目录单个 .gbsproj
   if (findGbsProjectFile(dir) !== null) return "gbs";
+  // Godot：project.godot
+  if (existsSync(path.join(dir, "project.godot"))) return "godot";
   return "mv";
 }
 
@@ -42,6 +45,8 @@ export function loadProjectAny(dir: string): { engine: EngineKind; project: AnyL
         ? loadTyrano(dir)
         : engine === "gbs"
           ? loadGbs(dir)
-          : loadMv(dir);
+          : engine === "godot"
+            ? loadGodot(dir)
+            : loadMv(dir);
   return { engine, project };
 }

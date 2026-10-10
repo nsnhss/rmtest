@@ -7,11 +7,11 @@
  * 3. IR 只描述"数据驱动 RPG 引擎"的公共概念，不引入引擎特有实现细节。
  */
 
-export const IR_SCHEMA_VERSION = 3;
+export const IR_SCHEMA_VERSION = 4;
 
 export interface IRDocument {
   schemaVersion: number;
-  engine: "mv" | "mz" | "rgss" | "tyrano" | "gbs";
+  engine: "mv" | "mz" | "rgss" | "tyrano" | "gbs" | "godot";
   engineVersion?: string;
   system: IRSystem;
   maps: IRMap[];
@@ -30,6 +30,8 @@ export interface IRDocument {
   tyrano?: IRTyranoSection;
   /** GB Studio 工程专属数据；非 GB Studio 工程为 undefined */
   gbs?: IRGBSSection;
+  /** Godot 工程专属数据；非 Godot 工程为 undefined */
+  godot?: IRGodotSection;
 }
 
 export interface IRSystem {
@@ -319,4 +321,57 @@ export interface IRGBSScriptEvent {
   command: string;
   args: Record<string, unknown>;
   children?: Record<string, IRGBSScriptEvent[] | undefined>;
+}
+
+/* ---- Godot 附加段 ---- */
+
+/** Godot 4.x 工程数据；非 Godot 工程此字段为 undefined */
+export interface IRGodotSection {
+  /** 主场景（res:// 相对路径；可能为 null = 未设置） */
+  mainScene: string | null;
+  autoloads: Array<{ name: string; path: string }>;
+  /** 工程内全部文件（相对工程根，/ 分隔；不含 .godot/ 与 *.import） */
+  files: string[];
+  /** uid://… → res:// 相对路径 */
+  uidToPath: Record<string, string>;
+  scenes: IRGodotScene[];
+  resources: IRGodotResource[];
+  /** .gd 路径 → 函数名清单（正则提取） */
+  scriptFuncs: Record<string, string[]>;
+  /** .gd 路径 → 字面量节点路径（get_node/$/^ 提取） */
+  scriptNodePaths: Record<string, string[]>;
+}
+
+export interface IRGodotRef {
+  id: string;
+  type: string;
+  /** 归一化 res:// 相对路径（无 res:// 前缀）；null = 仅 uid */
+  path: string | null;
+  uid: string | null;
+}
+
+export interface IRGodotScene {
+  /** 相对路径（如 "scenes/main.tscn"） */
+  path: string;
+  uid: string | null;
+  extResources: IRGodotRef[];
+  nodes: IRGodotNode[];
+  connections: Array<{ signal: string; from: string; to: string; method: string }>;
+}
+
+export interface IRGodotResource {
+  path: string;
+  uid: string | null;
+  extResources: IRGodotRef[];
+}
+
+export interface IRGodotNode {
+  /** 场景内绝对路径（根节点为 "."，子节点 "A/B"） */
+  path: string;
+  name: string;
+  type: string;
+  /** instance=ExtResource(id) 的 id；null = 非实例 */
+  instanceRefId: string | null;
+  /** 挂载脚本的 ext_resource 引用；null = 无脚本 */
+  scriptRef: IRGodotRef | null;
 }

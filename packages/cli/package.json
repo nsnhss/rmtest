@@ -12,6 +12,7 @@
     "@rmtest/adapter-rgss": "workspace:*",
     "@rmtest/adapter-tyrano": "workspace:*",
     "@rmtest/adapter-gbs": "workspace:*",
+    "@rmtest/adapter-godot": "workspace:*",
     "@rmtest/checkers": "workspace:*",
     "@rmtest/report": "workspace:*",
     "@rmtest/dsl": "workspace:*",

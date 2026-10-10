@@ -7,11 +7,11 @@
  * 3. IR 只描述"数据驱动 RPG 引擎"的公共概念，不引入引擎特有实现细节。
  */
 
-export const IR_SCHEMA_VERSION = 2;
+export const IR_SCHEMA_VERSION = 3;
 
 export interface IRDocument {
   schemaVersion: number;
-  engine: "mv" | "mz" | "rgss" | "tyrano";
+  engine: "mv" | "mz" | "rgss" | "tyrano" | "gbs";
   engineVersion?: string;
   system: IRSystem;
   maps: IRMap[];
@@ -28,6 +28,8 @@ export interface IRDocument {
   classes: IRClass[];
   /** TyranoScript 工程专属数据；非 Tyrano 工程为 undefined */
   tyrano?: IRTyranoSection;
+  /** GB Studio 工程专属数据；非 GB Studio 工程为 undefined */
+  gbs?: IRGBSSection;
 }
 
 export interface IRSystem {
@@ -240,4 +242,81 @@ export interface IRTyranoAssetRef {
   /** 文件名（含扩展名）；动态表达式为 null，跳过检查 */
   storage: string | null;
   line: number;
+}
+
+/* ---- GB Studio 附加段 ---- */
+
+/** GB Studio 工程数据；非 GB Studio 工程此字段为 undefined */
+export interface IRGBSSection {
+  startSceneId: string;
+  startX: number;
+  startY: number;
+  scenes: IRGBSScene[];
+  /** 自定义事件（现代格式 "scripts" / 旧格式 "customEvents" 归一化） */
+  customEvents: Array<{ id: string; name: string; script: IRGBSScriptEvent[] }>;
+  actorPrefabIds: string[];
+  triggerPrefabIds: string[];
+  spriteIds: string[];
+  backgroundIds: string[];
+  tilesetIds: string[];
+  soundIds: string[];
+  musicIds: string[];
+  emoteIds: string[];
+  avatarIds: string[];
+  fontIds: string[];
+  paletteIds: string[];
+  /** 资产 id → 相对文件路径与磁盘状态（加载器已核对） */
+  assetFiles: Array<{ id: string; filename: string; exists: boolean; caseInsensitiveMatch: boolean }>;
+}
+
+export interface IRGBSScene {
+  id: string;
+  name: string;
+  type: string;
+  width: number;
+  height: number;
+  backgroundId: string;
+  tilesetId: string;
+  paletteIds: string[];
+  spritePaletteIds: string[];
+  playerSpriteSheetId: string | null;
+  /** width*height 解压后的碰撞值：0 空 1 实心 2 梯子 3/4 扩展 */
+  collisions: number[];
+  actors: IRGBSActor[];
+  triggers: IRGBSTrigger[];
+  scripts: IRGBSScriptSet[];
+}
+
+export interface IRGBSScriptSet {
+  key: string;
+  events: IRGBSScriptEvent[];
+}
+
+export interface IRGBSActor {
+  id: string;
+  name: string;
+  prefabId: string | null;
+  x: number;
+  y: number;
+  spriteSheetId: string;
+  paletteId: string;
+  scripts: IRGBSScriptSet[];
+}
+
+export interface IRGBSTrigger {
+  id: string;
+  name: string;
+  prefabId: string | null;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  scripts: IRGBSScriptSet[];
+}
+
+export interface IRGBSScriptEvent {
+  id?: string;
+  command: string;
+  args: Record<string, unknown>;
+  children?: Record<string, IRGBSScriptEvent[] | undefined>;
 }

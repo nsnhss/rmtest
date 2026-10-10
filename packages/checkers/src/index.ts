@@ -11,6 +11,7 @@ import { fontChecker } from "./checkers/font.ts";
 import { firstRunFalseChecker } from "./checkers/first-run-false.ts";
 import { textOverflowChecker } from "./checkers/text-overflow.ts";
 import { tyranoCheckers } from "./checkers/tyrano.ts";
+import { gbsCheckers } from "./checkers/gbs.ts";
 
 export const checkers: CheckerPlugin[] = [
   danglingRefChecker,
@@ -27,6 +28,7 @@ export const checkers: CheckerPlugin[] = [
   fontChecker,
   firstRunFalseChecker,
   ...tyranoCheckers(),
+  ...gbsCheckers(),
 ];
 
 export { danglingRefChecker, assetDimensionChecker, faceIndexChecker, iconIndexChecker, pictureOffscreenChecker, pictureNoEraseChecker, textOverflowChecker };
@@ -38,4 +40,11 @@ export {
   tyranoSyntaxChecker,
   tyranoUnreachableLabelChecker,
 } from "./checkers/tyrano.ts";
+export {
+  gbsBrokenRefChecker,
+  gbsCollisionSoftlockChecker,
+  gbsLabelMissingChecker,
+  gbsMissingAssetChecker,
+  gbsStartSceneChecker,
+} from "./checkers/gbs.ts";
 export * from "./loader.ts";

@@ -1,5 +1,5 @@
 /**
- * 统一工程加载 —— MV/MZ、RGSS（VX Ace/XP/VX）与 TyranoScript 自动识别。
+ * 统一工程加载 —— MV/MZ、RGSS（VX Ace/XP/VX）、TyranoScript 与 GB Studio 自动识别。
  * 各加载器输出结构兼容（ir/universe/assets/fingerprint/fileHashes/warnings）。
  */
 import { existsSync } from "node:fs";
@@ -7,9 +7,10 @@ import path from "node:path";
 import { loadProject as loadMv, type LoadedProject as MvProject } from "@rmtest/adapter-mv";
 import { loadProject as loadRgss, type LoadedProject as RgssProject } from "@rmtest/adapter-rgss";
 import { loadProject as loadTyrano, type LoadedProject as TyranoProject } from "@rmtest/adapter-tyrano";
+import { findProjectFile as findGbsProjectFile, loadProject as loadGbs, type LoadedProject as GbsProject } from "@rmtest/adapter-gbs";
 
-export type EngineKind = "mv" | "rgss" | "tyrano";
-export type AnyLoadedProject = MvProject | RgssProject | TyranoProject;
+export type EngineKind = "mv" | "rgss" | "tyrano" | "gbs";
+export type AnyLoadedProject = MvProject | RgssProject | TyranoProject | GbsProject;
 
 export function detectEngine(dir: string): EngineKind {
   const markers = [
@@ -27,11 +28,20 @@ export function detectEngine(dir: string): EngineKind {
   ) {
     return "tyrano";
   }
+  // GB Studio：project.gbsproj 或根目录单个 .gbsproj
+  if (findGbsProjectFile(dir) !== null) return "gbs";
   return "mv";
 }
 
 export function loadProjectAny(dir: string): { engine: EngineKind; project: AnyLoadedProject } {
   const engine = detectEngine(dir);
-  const project = engine === "rgss" ? loadRgss(dir) : engine === "tyrano" ? loadTyrano(dir) : loadMv(dir);
+  const project =
+    engine === "rgss"
+      ? loadRgss(dir)
+      : engine === "tyrano"
+        ? loadTyrano(dir)
+        : engine === "gbs"
+          ? loadGbs(dir)
+          : loadMv(dir);
   return { engine, project };
 }

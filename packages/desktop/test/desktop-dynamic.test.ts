@@ -9,6 +9,13 @@ import { closeCdp, launchElectron } from "@rmtest/runtime";
 const PROJECT = process.env["RM_REAL_PROJECT"];
 const APP_DIR = path.resolve(import.meta.dirname, "..");
 
+/** DOM 层点击（evaluate 触发）——不依赖 puppeteer Input 域，规避协议层挂起 */
+async function click(page: Page, selector: string): Promise<void> {
+  await page.evaluate((sel) => {
+    (document.querySelector(sel) as HTMLElement).click();
+  }, selector);
+}
+
 let browser: Browser;
 let page: Page;
 let proc: Parameters<typeof closeCdp>[0]["proc"] | undefined;
@@ -75,8 +82,8 @@ describe.skipIf(!PROJECT)("桌面动态测试按钮（真实引擎）", () => {
       (document.getElementById("dynDir") as HTMLInputElement).value = dir;
       (document.getElementById("dynArg") as HTMLInputElement).value = "42";
     }, projectDir!);
-    await page.click("#fuzzBtn");
-    await page.waitForFunction(() => (document.getElementById("dynResult")?.textContent ?? "").includes("步数"), { timeout: 180_000 });
+    await click(page, "#fuzzBtn");
+    await page.waitForFunction(() => (document.getElementById("dynResult")?.textContent ?? "").includes("步数"), { timeout: 180_000, polling: 100 });
     const text = await page.evaluate(() => document.getElementById("dynResult")!.textContent!);
     expect(text).toContain("崩溃 0");
   });
@@ -86,11 +93,11 @@ describe.skipIf(!PROJECT)("桌面动态测试按钮（真实引擎）", () => {
       (document.getElementById("dynDir") as HTMLInputElement).value = dir;
       (document.getElementById("dynArg") as HTMLInputElement).value = "desk-tag";
     }, projectDir!);
-    await page.click("#goldenApproveBtn");
-    await page.waitForFunction(() => (document.getElementById("dynResult")?.textContent ?? "").includes("已批准"), { timeout: 180_000 });
+    await click(page, "#goldenApproveBtn");
+    await page.waitForFunction(() => (document.getElementById("dynResult")?.textContent ?? "").includes("已批准"), { timeout: 180_000, polling: 100 });
 
-    await page.click("#goldenCheckBtn");
-    await page.waitForFunction(() => (document.getElementById("dynResult")?.textContent ?? "").includes("diffRatio"), { timeout: 180_000 });
+    await click(page, "#goldenCheckBtn");
+    await page.waitForFunction(() => (document.getElementById("dynResult")?.textContent ?? "").includes("diffRatio"), { timeout: 180_000, polling: 100 });
     const text = await page.evaluate(() => document.getElementById("dynResult")!.textContent!);
     expect(text).toContain("diffRatio=0.0000");
   });
@@ -99,14 +106,14 @@ describe.skipIf(!PROJECT)("桌面动态测试按钮（真实引擎）", () => {
     await page.evaluate((dir) => {
       (document.getElementById("dynDir") as HTMLInputElement).value = dir;
     }, projectDir!);
-    await page.click("#recordStartBtn");
-    await page.waitForFunction(() => (document.getElementById("dynResult")?.textContent ?? "").includes("录制中"), { timeout: 180_000 });
+    await click(page, "#recordStartBtn");
+    await page.waitForFunction(() => (document.getElementById("dynResult")?.textContent ?? "").includes("录制中"), { timeout: 180_000, polling: 100 });
 
     // 找到游戏窗口并注入按键（录制器用 keydown 监听捕获）
     const pages = await browser.pages();
     const gamePage = pages.find((p) => p !== page && p.url().includes("index.html"))!;
     expect(gamePage).toBeTruthy();
-    await gamePage.waitForFunction(() => (window as never as { __rmtestReal?: { ready?: () => boolean } }).__rmtestReal?.ready?.() === true, { timeout: 60_000 });
+    await gamePage.waitForFunction(() => (window as never as { __rmtestReal?: { ready?: () => boolean } }).__rmtestReal?.ready?.() === true, { timeout: 60_000, polling: 100 });
 
     const key = async (k: string) => {
       await gamePage.evaluate((keyName) => {
@@ -121,8 +128,8 @@ describe.skipIf(!PROJECT)("桌面动态测试按钮（真实引擎）", () => {
     await key("ArrowDown");
     await key("ArrowDown");
 
-    await page.click("#recordStopBtn");
-    await page.waitForFunction(() => (document.getElementById("dynResult")?.textContent ?? "").includes("已保存"), { timeout: 180_000 });
+    await click(page, "#recordStopBtn");
+    await page.waitForFunction(() => (document.getElementById("dynResult")?.textContent ?? "").includes("已保存"), { timeout: 180_000, polling: 100 });
     const text = await page.evaluate(() => document.getElementById("dynResult")!.textContent!);
     expect(text).toContain("recorded-scenario.json");
 

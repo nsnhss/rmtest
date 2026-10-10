@@ -11,6 +11,7 @@
 - **TyranoScript 静态支持**：.ks 场景解析器（标签/跳转/资产引用/条件跟踪）+ Config.tjs 入口 + 资产清单加载器 + CLI 自动识别 + 6 项检查（跳转断链、缺失素材、自跳死循环、入口缺失、不可达标签、结构语法）；动态执行待有真实游戏工程后接入（Electron 层可整体复用）
 - **GB Studio 静态支持**：.gbsproj 解析（现代 4.3+ 资源格式与旧版 ≤4.2 格式双轨归一 + 碰撞串解压）+ CLI 自动识别 + 5 项检查（断链引用全谱、起始场景、碰撞软锁（起始/传送/演员出生实心 + TOPDOWN BFS 不可达）、资产缺失、标签断链）；依据官方仓库事件定义实证（含 LAST_SCENE/LAST_SPRITE/$self$ 等哨兵值）
 - **Godot 4.x 静态支持**：project.godot（ConfigFile）解析 + .tscn/.escn/.tres 文本解析（ext_resource/instance/script/connection，路径含 res:// 与相对路径双形态，依据 godot-docs tscn.rst 实证）+ 全文件清单与 uid→path 映射 + CLI 自动识别 + 5 项检查（资源缺失含大小写降级、PackedScene 实例环、连接处理函数、主场景/autoload 配置、脚本节点路径断链——get_node/$/^ 字面量在挂载场景树中逐段解析）
+- **RM2k/2k3 静态支持**：LCF 二进制解析（BER 整数/结构块/向量/事件命令，全部依据 liblcf 源码与 EasyRPG Player 解释器实证）+ RPG_RT.lmt/.ldb/Map*.lmu + CLI 自动识别 + 5 项检查（传送目标缺失/越界/传向区域、开关/变量/公共事件/图块集/动画/事件引用越界、地图树完整性（lmu 无登记/登记无 lmu/父链断裂）、素材缺失（音乐/音效/图/行走图/脸图/全景/战斗背景，大小写与扩展名不敏感）、工程级完整性）。图块通行性（chipsets passable_data）暂缓
 
 ## 已知缺口（按优先级）
 
@@ -32,7 +33,7 @@
 | TyranoScript（TyranoBuilder） | ✅ 已做：.ks 纯文本，6 项检查 | HTML5 → Electron 层整体复用（待真实游戏工程） | **首选，已落地静态** |
 | GB Studio | ✅ 已做：.gbsproj 双格式解析 + 5 项检查（断链/软锁/资产/标签） | 引擎为 GB ROM 编译目标，动态需模拟器宿主（未做） | **第二顺位，已落地静态** |
 | Godot 4.x | ✅ 已做：project.godot/.tscn/.tres 解析 + 5 项检查（资源缺失/实例环/连接处理/主场景/节点路径断链） | `--headless` + GUT 生态成熟；动态层需集成 Godot 二进制（未做） | **第三顺位，已落地静态** |
-| 2k/2k3 | liblcf 格式文档完整 | EasyRPG Player（GPL，活跃）可当宿主 | 路径完整，工程量最大 |
+| 2k/2k3 | ✅ 已做：LCF 二进制解析（liblcf 实证）+ 5 项检查（传送/引用越界/地图树/素材/工程完整性） | EasyRPG Player（GPL，活跃）可当宿主（未做） | **第四顺位，已落地静态** |
 | Wolf RPG / SRPG Studio / KRKR / Ren'Py / SGB / Bakin / PGM MV | 私有二进制或品类不匹配 | 原生 exe / 无宿主 | 暂不做 |
 
 ## 不做的事（定位边界）

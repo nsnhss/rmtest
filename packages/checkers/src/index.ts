@@ -13,6 +13,7 @@ import { textOverflowChecker } from "./checkers/text-overflow.ts";
 import { tyranoCheckers } from "./checkers/tyrano.ts";
 import { gbsCheckers } from "./checkers/gbs.ts";
 import { godotCheckers } from "./checkers/godot.ts";
+import { rm2kCheckers } from "./checkers/rm2k.ts";
 
 export const checkers: CheckerPlugin[] = [
   danglingRefChecker,
@@ -31,6 +32,7 @@ export const checkers: CheckerPlugin[] = [
   ...tyranoCheckers(),
   ...gbsCheckers(),
   ...godotCheckers(),
+  ...rm2kCheckers(),
 ];
 
 export { danglingRefChecker, assetDimensionChecker, faceIndexChecker, iconIndexChecker, pictureOffscreenChecker, pictureNoEraseChecker, textOverflowChecker };
@@ -56,4 +58,11 @@ export {
   godotNodePathChecker,
   godotSceneCycleChecker,
 } from "./checkers/godot.ts";
+export {
+  rm2kDanglingRefChecker,
+  rm2kMapTreeChecker,
+  rm2kMissingAssetChecker,
+  rm2kProjectChecker,
+  rm2kTeleportChecker,
+} from "./checkers/rm2k.ts";
 export * from "./loader.ts";

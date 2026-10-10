@@ -9,9 +9,10 @@ import { loadProject as loadRgss, type LoadedProject as RgssProject } from "@rmt
 import { loadProject as loadTyrano, type LoadedProject as TyranoProject } from "@rmtest/adapter-tyrano";
 import { findProjectFile as findGbsProjectFile, loadProject as loadGbs, type LoadedProject as GbsProject } from "@rmtest/adapter-gbs";
 import { loadProject as loadGodot, type LoadedProject as GodotProject } from "@rmtest/adapter-godot";
+import { loadProject as loadRm2k, type LoadedProject as Rm2kProject } from "@rmtest/adapter-rm2k";
 
-export type EngineKind = "mv" | "rgss" | "tyrano" | "gbs" | "godot";
-export type AnyLoadedProject = MvProject | RgssProject | TyranoProject | GbsProject | GodotProject;
+export type EngineKind = "mv" | "rgss" | "tyrano" | "gbs" | "godot" | "rm2k";
+export type AnyLoadedProject = MvProject | RgssProject | TyranoProject | GbsProject | GodotProject | Rm2kProject;
 
 export function detectEngine(dir: string): EngineKind {
   const markers = [
@@ -22,6 +23,8 @@ export function detectEngine(dir: string): EngineKind {
     path.join("Data", "System.rvdata"),
   ];
   if (markers.some((m) => existsSync(path.join(dir, m)))) return "rgss";
+  // RM2k/2k3：RPG_RT.ldb/.lmt
+  if (existsSync(path.join(dir, "RPG_RT.ldb")) || existsSync(path.join(dir, "RPG_RT.lmt"))) return "rm2k";
   // TyranoScript：系统配置或场景目录 + 运行入口
   if (
     existsSync(path.join(dir, "data", "system", "Config.tjs")) ||
@@ -47,6 +50,8 @@ export function loadProjectAny(dir: string): { engine: EngineKind; project: AnyL
           ? loadGbs(dir)
           : engine === "godot"
             ? loadGodot(dir)
-            : loadMv(dir);
+            : engine === "rm2k"
+              ? loadRm2k(dir)
+              : loadMv(dir);
   return { engine, project };
 }

@@ -7,7 +7,7 @@ export default defineConfig({
     fileParallelism: false,
     server: {
       deps: {
-        inline: ["@rmtest/core", "@rmtest/adapter-mv", "@rmtest/adapter-rgss", "@rmtest/adapter-tyrano", "@rmtest/adapter-gbs", "@rmtest/adapter-godot", "@rmtest/checkers", "@rmtest/report", "@rmtest/dsl", "@rmtest/freshness", "@rmtest/runtime", "@rmtest/ai"],
+        inline: ["@rmtest/core", "@rmtest/adapter-mv", "@rmtest/adapter-rgss", "@rmtest/adapter-tyrano", "@rmtest/adapter-gbs", "@rmtest/adapter-godot", "@rmtest/adapter-rm2k", "@rmtest/checkers", "@rmtest/report", "@rmtest/dsl", "@rmtest/freshness", "@rmtest/runtime", "@rmtest/ai"],
       },
     },
   },

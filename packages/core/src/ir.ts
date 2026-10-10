@@ -7,11 +7,11 @@
  * 3. IR 只描述"数据驱动 RPG 引擎"的公共概念，不引入引擎特有实现细节。
  */
 
-export const IR_SCHEMA_VERSION = 4;
+export const IR_SCHEMA_VERSION = 5;
 
 export interface IRDocument {
   schemaVersion: number;
-  engine: "mv" | "mz" | "rgss" | "tyrano" | "gbs" | "godot";
+  engine: "mv" | "mz" | "rgss" | "tyrano" | "gbs" | "godot" | "rm2k";
   engineVersion?: string;
   system: IRSystem;
   maps: IRMap[];
@@ -32,6 +32,8 @@ export interface IRDocument {
   gbs?: IRGBSSection;
   /** Godot 工程专属数据；非 Godot 工程为 undefined */
   godot?: IRGodotSection;
+  /** RPG Maker 2000/2003 工程专属数据；非 2k/2k3 工程为 undefined */
+  rm2k?: IRRm2kSection;
 }
 
 export interface IRSystem {
@@ -374,4 +376,80 @@ export interface IRGodotNode {
   instanceRefId: string | null;
   /** 挂载脚本的 ext_resource 引用；null = 无脚本 */
   scriptRef: IRGodotRef | null;
+}
+
+/* ---- RPG Maker 2000/2003 附加段 ---- */
+
+/** RM2k/2k3 工程数据；非 2k/2k3 工程此字段为 undefined */
+export interface IRRm2kSection {
+  /** LDB version：1 = RM2k，2 = RM2k3 */
+  version: number;
+  /** 地图树（含 area 节点） */
+  mapTree: IRRm2kMapInfo[];
+  /** 队伍起始位置 */
+  start: { mapId: number; x: number; y: number };
+  maps: IRRm2kMap[];
+  /** 开关名（索引 0 = id 1） */
+  switches: string[];
+  /** 变量名 */
+  variables: string[];
+  commonEvents: Array<{ id: number; name: string; commands: IRRm2kCommand[] }>;
+  /** chipset id → 名 */
+  chipsets: Record<number, string>;
+  /** animation id → Battle 动画文件名 */
+  animations: Record<number, string>;
+  /** 资产目录（小写目录名 → 文件名清单（含扩展名）） */
+  assetDirs: Record<string, string[]>;
+}
+
+export interface IRRm2kMapInfo {
+  id: number;
+  name: string;
+  parent: number;
+  indentation: number;
+  /** 0 root / 1 map / 2 area */
+  type: number;
+  /** music_type==2 时的音乐名；否则空 */
+  musicName: string;
+  /** 背景（Panorama）名 */
+  backgroundName: string;
+  teleport: number;
+  escape: number;
+  save: number;
+}
+
+export interface IRRm2kMap {
+  id: number;
+  chipsetId: number;
+  width: number;
+  height: number;
+  parallaxName: string;
+  events: IRRm2kEvent[];
+}
+
+export interface IRRm2kEvent {
+  id: number;
+  name: string;
+  x: number;
+  y: number;
+  pages: IRRm2kEventPage[];
+}
+
+export interface IRRm2kEventPage {
+  /** 页条件里引用的开关 id 列表 */
+  conditionSwitchIds: number[];
+  conditionVariableId: number | null;
+  conditionVariableValue: number;
+  charsetName: string;
+  trigger: number;
+  commands: IRRm2kCommand[];
+}
+
+export interface IRRm2kCommand {
+  code: number;
+  indent: number;
+  string: string;
+  parameters: number[];
+  /** 所在页码（0 起；-1 = 公共事件） */
+  page: number;
 }

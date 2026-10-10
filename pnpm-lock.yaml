@@ -215,6 +215,12 @@ importers:
         specifier: workspace:*
         version: link:../../core
 
+  packages/adapters/rm2k:
+    dependencies:
+      '@rmtest/core':
+        specifier: workspace:*
+        version: link:../../core
+
   packages/adapters/tyrano:
     dependencies:
       '@rmtest/core':
@@ -245,6 +251,9 @@ importers:
       '@rmtest/adapter-mv':
         specifier: workspace:*
         version: link:../adapters/mv
+      '@rmtest/adapter-rm2k':
+        specifier: workspace:*
+        version: link:../adapters/rm2k
       '@rmtest/adapter-tyrano':
         specifier: workspace:*
         version: link:../adapters/tyrano
@@ -263,6 +272,9 @@ importers:
       '@rmtest/adapter-rgss':
         specifier: workspace:*
         version: link:../adapters/rgss
+      '@rmtest/adapter-rm2k':
+        specifier: workspace:*
+        version: link:../adapters/rm2k
       '@rmtest/adapter-tyrano':
         specifier: workspace:*
         version: link:../adapters/tyrano

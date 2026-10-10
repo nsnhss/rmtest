@@ -9,6 +9,13 @@ import { closeCdp, launchElectron } from "@rmtest/runtime";
 const APP_DIR = path.resolve(import.meta.dirname, "..");
 const FIXTURE_DATA = new URL("../../../packages/adapters/mv/fixtures/mini/data/", import.meta.url);
 
+/** DOM 层点击（evaluate 触发）——不依赖 puppeteer Input 域，规避协议层挂起 */
+async function click(page: Page, selector: string): Promise<void> {
+  await page.evaluate((sel) => {
+    (document.querySelector(sel) as HTMLElement).click();
+  }, selector);
+}
+
 let browser: Browser | undefined;
 let page: Page;
 let proc: Parameters<typeof closeCdp>[0]["proc"] | undefined;
@@ -81,8 +88,8 @@ describe("桌面 UI 冒烟", () => {
     await page.evaluate((dir) => {
       (document.getElementById("scanDir") as HTMLInputElement).value = dir;
     }, projectDir!);
-    await page.click("#scanBtn");
-    await page.waitForFunction(() => (document.getElementById("scanResult")?.textContent ?? "").includes("错误"), { timeout: 90_000 });
+    await click(page, "#scanBtn");
+    await page.waitForFunction(() => (document.getElementById("scanResult")?.textContent ?? "").includes("错误"), { timeout: 90_000, polling: 100 });
 
     const text = await page.evaluate(() => document.getElementById("scanResult")!.textContent!);
     expect(text).toMatch(/错误 \d+/);
@@ -99,8 +106,8 @@ describe("桌面 UI 冒烟", () => {
     await page.evaluate((dir) => {
       (document.getElementById("contentDir") as HTMLInputElement).value = dir;
     }, projectDir!);
-    await page.click("#contentBtn");
-    await page.waitForFunction(() => (document.getElementById("contentResult")?.textContent ?? "").includes("可达事件页"), { timeout: 90_000 });
+    await click(page, "#contentBtn");
+    await page.waitForFunction(() => (document.getElementById("contentResult")?.textContent ?? "").includes("可达事件页"), { timeout: 90_000, polling: 100 });
 
     const text = await page.evaluate(() => document.getElementById("contentResult")!.textContent!);
     expect(text).toContain("可达事件页 2 个");
@@ -111,8 +118,8 @@ describe("桌面 UI 冒烟", () => {
     await page.evaluate((dir) => {
       (document.getElementById("corpusDir") as HTMLInputElement).value = dir;
     }, projectDir!);
-    await page.click("#corpusListBtn");
-    await page.waitForFunction(() => (document.getElementById("corpusResult")?.textContent ?? "").includes("语料"), { timeout: 90_000 });
+    await click(page, "#corpusListBtn");
+    await page.waitForFunction(() => (document.getElementById("corpusResult")?.textContent ?? "").includes("语料"), { timeout: 90_000, polling: 100 });
 
     const text = await page.evaluate(() => document.getElementById("corpusResult")!.textContent!);
     expect(text).toContain("语料 0 个场景");
@@ -122,8 +129,8 @@ describe("桌面 UI 冒烟", () => {
     await page.evaluate((dir) => {
       (document.getElementById("vizDir") as HTMLInputElement).value = dir;
     }, projectDir!);
-    await page.click("#coverageBtn");
-    await page.waitForFunction(() => (document.getElementById("vizResult")?.textContent ?? "").includes("场景覆盖"), { timeout: 90_000 });
+    await click(page, "#coverageBtn");
+    await page.waitForFunction(() => (document.getElementById("vizResult")?.textContent ?? "").includes("场景覆盖"), { timeout: 90_000, polling: 100 });
 
     const text = await page.evaluate(() => document.getElementById("vizResult")!.textContent!);
     expect(text).toContain("场景覆盖: 0/2");
@@ -134,8 +141,8 @@ describe("桌面 UI 冒烟", () => {
     await page.evaluate((dir) => {
       (document.getElementById("vizDir") as HTMLInputElement).value = dir;
     }, projectDir!);
-    await page.click("#trendsBtn");
-    await page.waitForFunction(() => (document.getElementById("vizResult")?.textContent ?? "").includes("回归记录"), { timeout: 90_000 });
+    await click(page, "#trendsBtn");
+    await page.waitForFunction(() => (document.getElementById("vizResult")?.textContent ?? "").includes("回归记录"), { timeout: 90_000, polling: 100 });
 
     const text = await page.evaluate(() => document.getElementById("vizResult")!.textContent!);
     expect(text).toContain("近 14 天无回归记录");

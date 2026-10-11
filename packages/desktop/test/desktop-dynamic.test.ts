@@ -60,6 +60,8 @@ beforeAll(async () => {
     electronPath: electronExe,
     appDir: APP_DIR,
     port,
+    // 冷启动余量（CI 首次运行 Electron 可能远超 30s）
+    timeoutMs: 90_000,
   });
   browser = session.browser as Browser;
   proc = session.proc;
@@ -74,7 +76,7 @@ beforeAll(async () => {
   // 断言的是中文文案：固定为 zh，抵消上次运行遗留的 localStorage
   await page.waitForFunction(() => document.getElementById("langSelect")?.children.length === 4, { timeout: 20_000 });
   await setLang(page, "zh");
-}, 120_000);
+}, 240_000);
 
 afterAll(async () => {
   if (browser && proc) {

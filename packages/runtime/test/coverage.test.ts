@@ -8,10 +8,11 @@ let fx: ElectronFixture;
 
 beforeAll(async () => {
   fx = await launchFixture();
-}, 60_000);
+}, 180_000);
 
 afterAll(async () => {
-  await fx.close();
+  // 启动失败时 fx 仍未赋值：清理不得再抛 TypeError 掩盖真实原因
+  await fx?.close();
 });
 
 const interactScenario: Scenario = {

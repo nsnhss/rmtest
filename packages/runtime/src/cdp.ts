@@ -32,12 +32,13 @@ export async function launchElectron(
   opts: LaunchOptions,
 ): Promise<CdpSession> {
   const port = opts.port ?? 9222;
+  const timeoutMs = opts.timeoutMs ?? 60_000;
   const proc = spawn(opts.electronPath, [opts.appDir, `--remote-debugging-port=${port}`], {
     stdio: "ignore",
     env: { ...process.env, ...(opts.env ?? {}) },
   });
 
-  const deadline = Date.now() + (opts.timeoutMs ?? 30_000);
+  const deadline = Date.now() + timeoutMs;
   const jsonUrl = `http://127.0.0.1:${port}/json/list`;
   for (;;) {
     try {
@@ -51,7 +52,7 @@ export async function launchElectron(
     }
     if (Date.now() > deadline) {
       proc.kill();
-      throw new Error(`Electron 页面目标在 ${opts.timeoutMs ?? 30_000}ms 内未就绪`);
+      throw new Error(`Electron 页面目标在 ${timeoutMs}ms 内未就绪`);
     }
     await sleep(300);
   }

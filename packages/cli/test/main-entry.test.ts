@@ -17,8 +17,9 @@ function runCli(args: string[], cwd: string): { status: number; stdout: string; 
     const stdout = execFileSync(process.execPath, ["--import", "tsx", path.join(cwd, "packages", "cli", "src", "main.ts"), ...args], {
       encoding: "utf8",
       cwd,
-      // 清掉 vitest 注入的 NODE_OPTIONS（否则 tsx 加载器与 vite-node 钩子冲突）
-      env: { ...process.env, NODE_OPTIONS: "" },
+      // 清掉 vitest 注入的 NODE_OPTIONS（否则 tsx 加载器与 vite-node 钩子冲突）；
+      // 固定语言为中文：CLI 默认跟随系统语言，断言不能依赖执行机器的 locale
+      env: { ...process.env, NODE_OPTIONS: "", RMTEST_LANG: "zh" },
       stdio: ["ignore", "pipe", "pipe"],
       timeout: 60_000,
     });

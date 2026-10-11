@@ -20,6 +20,8 @@ export async function launchFixture(): Promise<ElectronFixture> {
     electronPath: electronExe,
     appDir,
     port,
+    // 冷启动余量：CI 首次运行 Electron（二进制刚解压 + 安全软件扫描）可能远超 30s
+    timeoutMs: 90_000,
   });
   const browser = session.browser as Browser;
   // 页面可能还在加载（URL 尚未变为 fixture.html），轮询等待

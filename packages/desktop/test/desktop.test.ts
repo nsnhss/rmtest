@@ -67,7 +67,7 @@ beforeAll(async () => {
     appDir: APP_DIR,
     port,
     // 冷启动余量（CI 首次运行 Electron 可能远超 30s）
-    timeoutMs: 90_000,
+    timeoutMs: 180_000,
   });
   browser = session.browser as Browser;
   proc = session.proc;

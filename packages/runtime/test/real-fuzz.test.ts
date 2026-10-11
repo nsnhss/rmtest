@@ -43,7 +43,7 @@ describe("真实引擎 fuzz 的确定性", () => {
 
   beforeAll(async () => {
     fx = await launchFixture();
-  }, 60_000);
+  }, 240_000);
 
   afterAll(async () => {
     await fx.close();

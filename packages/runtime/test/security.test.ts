@@ -10,7 +10,7 @@ let fx: ElectronFixture;
 
 beforeAll(async () => {
   fx = await launchFixture();
-}, 60_000);
+}, 240_000);
 
 afterAll(async () => {
   await fx.close();
@@ -67,5 +67,5 @@ describe("真实引擎加载路径的加固接线", () => {
       if (session) await closeRealGame(session);
       rmSync(dir, { recursive: true, force: true });
     }
-  }, 60_000);
+  }, 240_000);
 });

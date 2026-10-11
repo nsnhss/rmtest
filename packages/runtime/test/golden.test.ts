@@ -8,7 +8,7 @@ let fx: ElectronFixture;
 
 beforeAll(async () => {
   fx = await launchFixture();
-}, 60_000);
+}, 240_000);
 
 afterAll(async () => {
   await fx.close();

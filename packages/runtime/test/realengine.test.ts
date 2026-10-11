@@ -30,7 +30,7 @@ describe.skipIf(!PROJECT)("真实 MV 引擎验证", () => {
     await session.page.evaluate(() => {
       (window as never as { __rmtestReal?: { setupNewGame: () => void } }).__rmtestReal!.setupNewGame();
     });
-  }, 120_000);
+  }, 240_000);
 
   afterAll(async () => {
     await closeRealGame(session);
@@ -110,7 +110,7 @@ describe("walkPathTo 瓦片通行方向语义（stub 引擎）", () => {
   beforeAll(async () => {
     fx = await launchFixture();
     await fx.page.evaluate(REAL_BRIDGE);
-  }, 60_000);
+  }, 240_000);
 
   afterAll(async () => {
     await fx.close();

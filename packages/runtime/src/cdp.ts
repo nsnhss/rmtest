@@ -2,7 +2,7 @@
  * CDP 桥：启动 Electron（自带 Chromium）+ 连接 puppeteer-core。
  * 这是动态执行层的地基 —— 后续所有"跑游戏"都走这条通道。
  */
-import { spawn, type ChildProcess } from "node:child_process";
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 
 export interface CdpSession {
   browser: unknown; // puppeteer-core Browser；类型在此处保持松耦合，避免核心包依赖
@@ -51,7 +51,7 @@ export async function launchElectron(
       // CDP 尚未就绪，重试
     }
     if (Date.now() > deadline) {
-      proc.kill();
+      killTree(proc);
       throw new Error(`Electron 页面目标在 ${timeoutMs}ms 内未就绪`);
     }
     await sleep(300);
@@ -61,13 +61,29 @@ export async function launchElectron(
   return { browser, proc, port };
 }
 
+/**
+ * 终止 Electron 进程树。Windows 上 `ChildProcess.kill()` 只杀主进程，
+ * 渲染/GPU 子进程残留（孤儿进程会占住调试端口、拖垮后续启动），故用 taskkill /T /F。
+ */
+function killTree(proc: ChildProcess): void {
+  if (process.platform === "win32" && proc.pid) {
+    try {
+      spawnSync("taskkill", ["/pid", String(proc.pid), "/T", "/F"], { stdio: "ignore" });
+    } catch {
+      // 进程可能已退出，忽略
+    }
+  } else {
+    proc.kill();
+  }
+}
+
 export async function closeCdp(session: CdpSession, browserClose?: (b: unknown) => Promise<void>): Promise<void> {
   try {
     await browserClose?.(session.browser);
   } catch {
     // 连接可能已断，忽略
   }
-  session.proc.kill();
+  killTree(session.proc);
 }
 
 function sleep(ms: number): Promise<void> {

@@ -3,6 +3,8 @@
  * 只在 IR 含 tyrano 段时产出报告；MV/MZ/RGSS 工程一律空转。
  */
 import type { CheckerPlugin, IRTyranoSection, ReportSection } from "@rmtest/core";
+import type { LocalizableMessage } from "@rmtest/i18n";
+import { tyrano } from "../i18n/tyrano.ts";
 
 type TSection = IRTyranoSection;
 
@@ -12,10 +14,18 @@ function sec(
   type: string,
   severity: ReportSection["severity"],
   confidence: ReportSection["confidence"],
-  message: string,
+  message: LocalizableMessage,
   evidence?: unknown,
 ): ReportSection {
-  return { type, severity, confidence, message, evidence };
+  return {
+    type,
+    severity,
+    confidence,
+    message: message.message,
+    messageId: message.messageId,
+    messageParams: message.messageParams,
+    evidence,
+  };
 }
 
 /** 跳转/调用/按钮/链接 → 目标场景文件或标签不存在 */
@@ -37,7 +47,13 @@ export const tyranoBrokenJumpChecker: CheckerPlugin = {
                 "tyrano-broken-jump",
                 "error",
                 "high",
-                `场景 ${s.file} 标签 *${l.name} 第 ${j.line} 行：${j.kind} 的目标场景 ${targetFile} 不存在`,
+                tyrano("checker.tyrano.brokenJumpMissingScenario", {
+                  file: s.file,
+                  label: l.name,
+                  line: j.line,
+                  kind: j.kind,
+                  targetFile,
+                }),
                 { file: s.file, label: l.name, line: j.line },
               ),
             );
@@ -49,7 +65,14 @@ export const tyranoBrokenJumpChecker: CheckerPlugin = {
                 "tyrano-broken-jump",
                 "error",
                 "high",
-                `场景 ${s.file} 标签 *${l.name} 第 ${j.line} 行：${j.kind} 的目标标签 *${j.target}（场景 ${targetFile}）不存在`,
+                tyrano("checker.tyrano.brokenJumpMissingLabel", {
+                  file: s.file,
+                  label: l.name,
+                  line: j.line,
+                  kind: j.kind,
+                  target: j.target,
+                  targetFile,
+                }),
                 { file: s.file, label: l.name, line: j.line, target: j.target },
               ),
             );
@@ -81,7 +104,13 @@ export const tyranoMissingAssetChecker: CheckerPlugin = {
                 "tyrano-missing-asset",
                 "warning",
                 "low",
-                `场景 ${s.file} 标签 *${l.name} 第 ${a.line} 行：${a.kind} 资源 ${a.storage} 存在但大小写不一致`,
+                tyrano("checker.tyrano.assetCaseMismatch", {
+                  file: s.file,
+                  label: l.name,
+                  line: a.line,
+                  kind: a.kind,
+                  storage: a.storage,
+                }),
                 evidence,
               ),
             );
@@ -91,7 +120,13 @@ export const tyranoMissingAssetChecker: CheckerPlugin = {
                 "tyrano-missing-asset",
                 "error",
                 "high",
-                `场景 ${s.file} 标签 *${l.name} 第 ${a.line} 行：${a.kind} 资源 ${a.storage} 缺失`,
+                tyrano("checker.tyrano.assetMissing", {
+                  file: s.file,
+                  label: l.name,
+                  line: a.line,
+                  kind: a.kind,
+                  storage: a.storage,
+                }),
                 evidence,
               ),
             );
@@ -120,7 +155,7 @@ export const tyranoSelfLoopChecker: CheckerPlugin = {
               "tyrano-self-loop",
               "error",
               "high",
-              `场景 ${s.file} 标签 *${l.name} 第 ${j.line} 行：无条件跳回自身 → 死循环`,
+              tyrano("checker.tyrano.selfLoop", { file: s.file, label: l.name, line: j.line }),
               { file: s.file, label: l.name, line: j.line },
             ),
           );
@@ -140,7 +175,7 @@ export const tyranoEntryChecker: CheckerPlugin = {
     const files = new Set(t.scenarios.map((s) => s.file));
     if (files.has(t.entryScenario)) return NO_SECTIONS;
     return [
-      sec("tyrano-entry", "error", "high", `入口场景 ${t.entryScenario} 缺失，游戏无法启动`, {
+      sec("tyrano-entry", "error", "high", tyrano("checker.tyrano.entryScenarioMissing", { entryScenario: t.entryScenario }), {
         entryScenario: t.entryScenario,
       }),
     ];
@@ -173,7 +208,7 @@ export const tyranoUnreachableLabelChecker: CheckerPlugin = {
               "tyrano-unreachable-label",
               "info",
               "low",
-              `场景 ${s.file} 标签 *${l.name} 无任何静态跳转指向（动态跳转或 iscript 可达则忽略）`,
+              tyrano("checker.tyrano.unreachableLabel", { file: s.file, label: l.name }),
               { file: s.file, label: l.name },
             ),
           );
@@ -193,7 +228,7 @@ export const tyranoSyntaxChecker: CheckerPlugin = {
     const out: ReportSection[] = [];
     for (const s of t.scenarios) {
       for (const e of s.syntaxErrors) {
-        out.push(sec("tyrano-syntax", "error", "high", `场景 ${s.file} 第 ${e.line} 行：${e.message}`, { file: s.file, line: e.line }));
+        out.push(sec("tyrano-syntax", "error", "high", tyrano("checker.tyrano.syntaxError", { file: s.file, line: e.line, message: e.message }), { file: s.file, line: e.line }));
       }
     }
     return out;

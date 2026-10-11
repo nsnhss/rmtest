@@ -4,13 +4,21 @@
  * 脚本调用（355/655）不解析，故置信度保守（medium/low），消息中注明。
  */
 import { type CheckerPlugin, formatLocation, type Lifecycle, type ReportSection, type SwitchUse } from "@rmtest/core";
+import type { LocalizableMessage } from "@rmtest/i18n";
+import { core } from "../i18n/core.ts";
+
+const KIND_LABEL: Record<"switch" | "variable", LocalizableMessage> = {
+  switch: core("checker.core.kind.switch"),
+  variable: core("checker.core.kind.variable"),
+};
 
 function firstRead(u: SwitchUse) {
   return u.reads[0];
 }
 
-function reportNeverWritten(kind: "开关" | "变量", life: Lifecycle, sections: ReportSection[]): void {
-  const map = kind === "开关" ? life.switches : life.variables;
+function reportNeverWritten(kind: "switch" | "variable", life: Lifecycle, sections: ReportSection[]): void {
+  const map = kind === "switch" ? life.switches : life.variables;
+  const label = KIND_LABEL[kind];
   for (const [id, use] of map) {
     if (id <= 0) continue;
     if (use.reads.length > 0 && use.writes.length === 0) {
@@ -19,15 +27,16 @@ function reportNeverWritten(kind: "开关" | "变量", life: Lifecycle, sections
         severity: "error",
         confidence: "medium",
         location: firstRead(use),
-        message: `${kind} ${id} 被读取但事件层从未写入 —— 条件恒为假/恒为初始值，相关分支永不触发（脚本写入不计入）`,
-        evidence: { kind, id, readCount: use.reads.length },
+        ...core("checker.core.readNeverWritten", { kind: label, id }),
+        evidence: { kind: label.message, id, readCount: use.reads.length },
       });
     }
   }
 }
 
-function reportNeverRead(kind: "开关" | "变量", life: Lifecycle, sections: ReportSection[]): void {
-  const map = kind === "开关" ? life.switches : life.variables;
+function reportNeverRead(kind: "switch" | "variable", life: Lifecycle, sections: ReportSection[]): void {
+  const map = kind === "switch" ? life.switches : life.variables;
+  const label = KIND_LABEL[kind];
   for (const [id, use] of map) {
     if (id <= 0) continue;
     if (use.writes.length > 0 && use.reads.length === 0) {
@@ -36,8 +45,8 @@ function reportNeverRead(kind: "开关" | "变量", life: Lifecycle, sections: R
         severity: "info",
         confidence: "low",
         location: use.writes[0],
-        message: `${kind} ${id} 被写入但从未被读取 —— 死逻辑或写错了开关号（脚本读取不计入）`,
-        evidence: { kind, id, writeCount: use.writes.length },
+        ...core("checker.core.writtenNeverRead", { kind: label, id }),
+        evidence: { kind: label.message, id, writeCount: use.writes.length },
       });
     }
   }
@@ -48,8 +57,8 @@ export const readNeverWrittenChecker: CheckerPlugin = {
   check(facts) {
     const life = facts["lifecycle"] as Lifecycle;
     const sections: ReportSection[] = [];
-    reportNeverWritten("开关", life, sections);
-    reportNeverWritten("变量", life, sections);
+    reportNeverWritten("switch", life, sections);
+    reportNeverWritten("variable", life, sections);
     return sections;
   },
 };
@@ -59,8 +68,8 @@ export const writtenNeverReadChecker: CheckerPlugin = {
   check(facts) {
     const life = facts["lifecycle"] as Lifecycle;
     const sections: ReportSection[] = [];
-    reportNeverRead("开关", life, sections);
-    reportNeverRead("变量", life, sections);
+    reportNeverRead("switch", life, sections);
+    reportNeverRead("variable", life, sections);
     return sections;
   },
 };

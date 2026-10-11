@@ -4,27 +4,28 @@
  */
 import {
   type CheckerPlugin,
-  formatLocation,
   type GameUniverse,
   type RefCategory,
   type RefGraph,
   type ReportSection,
 } from "@rmtest/core";
+import type { LocalizableMessage } from "@rmtest/i18n";
+import { core, locationMsg } from "../i18n/core.ts";
 
-const CATEGORY_LABEL: Record<string, string> = {
-  map: "地图",
-  switch: "开关",
-  variable: "变量",
-  commonEvent: "公共事件",
-  item: "道具",
-  weapon: "武器",
-  armor: "防具",
-  skill: "技能",
-  actor: "角色",
-  troop: "战斗队伍",
-  enemy: "敌人",
-  class: "职业",
-  tileset: "图块集",
+const CATEGORY_LABEL: Record<string, LocalizableMessage> = {
+  map: core("checker.core.category.map"),
+  switch: core("checker.core.category.switch"),
+  variable: core("checker.core.category.variable"),
+  commonEvent: core("checker.core.category.commonEvent"),
+  item: core("checker.core.category.item"),
+  weapon: core("checker.core.category.weapon"),
+  armor: core("checker.core.category.armor"),
+  skill: core("checker.core.category.skill"),
+  actor: core("checker.core.category.actor"),
+  troop: core("checker.core.category.troop"),
+  enemy: core("checker.core.category.enemy"),
+  class: core("checker.core.category.class"),
+  tileset: core("checker.core.category.tileset"),
 };
 
 function idExists(universe: GameUniverse, category: RefCategory, id: number): boolean {
@@ -86,7 +87,7 @@ export const danglingRefChecker: CheckerPlugin = {
             severity: "warning",
             confidence: "low",
             location: ref.location,
-            message: `资源 ${ref.target} 大小写不一致：磁盘上是 ${actual}。Windows 下正常，部署到 Linux/移动端会缺失`,
+            ...core("checker.core.danglingCaseMismatch", { target: ref.target, actual }),
             evidence: { ref: ref.target, actual },
           });
           continue;
@@ -96,7 +97,7 @@ export const danglingRefChecker: CheckerPlugin = {
           severity: "error",
           confidence: "high",
           location: ref.location,
-          message: `缺失资源: ${ref.target}`,
+          ...core("checker.core.danglingAsset", { target: ref.target }),
           evidence: { ref: ref.target },
         });
         continue;
@@ -109,7 +110,11 @@ export const danglingRefChecker: CheckerPlugin = {
           severity: "error",
           confidence: "high",
           location: ref.location,
-          message: `悬空引用: ${CATEGORY_LABEL[ref.category] ?? ref.category} ${ref.target} 不存在（${formatLocation(ref.location)}）`,
+          ...core("checker.core.danglingReference", {
+            category: CATEGORY_LABEL[ref.category] ?? ref.category,
+            target: ref.target,
+            location: locationMsg(ref.location),
+          }),
           evidence: { category: ref.category, target: ref.target },
         });
       }

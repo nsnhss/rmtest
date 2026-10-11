@@ -350,6 +350,152 @@ describe("checkers v1", () => {
     }
   });
 
+  it("页面由同一开关门控 → 不报恒假（该开关必为 ON）", () => {
+    const p = buildProject(fullAssets());
+    try {
+      // EV002 页由开关 2 门控，页内判断开关 2 之后再写开关 2：
+      // 页面运行即意味着开关 2 为 ON，故"首次触发恒假"不成立
+      p.writeJson("Map001.json", (d) => {
+        const ev2 = (d["events"] as Array<Record<string, unknown> | null>)[2]!;
+        const page = (ev2["pages"] as Array<Record<string, unknown>>)[0]!;
+        const cond = page["conditions"] as Record<string, unknown>;
+        cond["switch1Id"] = 2;
+        cond["switch1Valid"] = true;
+        (page["list"] as Array<Record<string, unknown>>).splice(
+          -1,
+          0,
+          { code: 111, indent: 0, parameters: [0, 2] },
+          { code: 121, indent: 1, parameters: [2, 2, 0] },
+          { code: 412, indent: 0, parameters: [] },
+        );
+      });
+      expect(run(p.loaded()).sections.filter((s) => s.type === "first-run-false")).toEqual([]);
+    } finally {
+      p.destroy();
+    }
+  });
+
+  it("公共事件内的传送 → 目标地图可达且软锁可见", () => {
+    const p = buildProject(fullAssets());
+    try {
+      // 移除地图事件中通往地图 2 的传送；改由公共事件传送（越界坐标 → 软锁）
+      p.writeJson("Map001.json", (d) => {
+        const ev1 = (d["events"] as Array<Record<string, unknown> | null>)[1]!;
+        const page = (ev1["pages"] as Array<Record<string, unknown>>)[0]!;
+        const list = page["list"] as Array<Record<string, unknown>>;
+        list.splice(
+          list.findIndex((c) => c["code"] === 201),
+          1,
+        );
+      });
+      p.writeJson("CommonEvents.json", (d) => {
+        const ce = (d as unknown as unknown[])[1] as Record<string, unknown>;
+        (ce["list"] as Array<Record<string, unknown>>).splice(-1, 0, { code: 201, indent: 0, parameters: [0, 2, 99, 99, 0, 0] });
+      });
+      const sections = run(p.loaded()).sections;
+      // 地图 2 仅经公共事件可达 → 不得报不可达
+      expect(sections.filter((s) => s.type === "unreachable-map" && s.message.includes("地图 2"))).toHaveLength(0);
+      // 公共事件内的越界传送 → 软锁可见
+      const soft = sections.filter((s) => s.type === "transfer-softlock" && s.location?.dataKey === "commonEvent");
+      expect(soft).toHaveLength(1);
+      expect(soft[0]!.message).toContain("越界");
+    } finally {
+      p.destroy();
+    }
+  });
+
+  it("公共事件内的图片与脸图引用 → 被对应检查器覆盖", () => {
+    const p = buildProject(fullAssets());
+    try {
+      p.writeJson("CommonEvents.json", (d) => {
+        const ce = (d as unknown as unknown[])[1] as Record<string, unknown>;
+        (ce["list"] as Array<Record<string, unknown>>).splice(
+          -1,
+          0,
+          { code: 231, indent: 0, parameters: [1, "", 1, 2000, 2000, 100, 100, 255, 0] }, // 锚点出屏
+          { code: 101, indent: 0, parameters: ["Actor1", 8, 0, 2] }, // 脸图索引越界
+          { code: 401, indent: 1, parameters: ["hi"] },
+        );
+      });
+      const common = run(p.loaded()).sections.filter((s) => s.location?.dataKey === "commonEvent");
+      expect(common.some((s) => s.type === "picture-offscreen")).toBe(true);
+      expect(common.some((s) => s.type === "picture-no-erase")).toBe(true);
+      expect(common.filter((s) => s.type === "face-index")).toHaveLength(1);
+    } finally {
+      p.destroy();
+    }
+  });
+
+  it("韩文（谚文）标题/对话 + 无 CJK 字体 → font-check 告警", () => {
+    const assets = fullAssets();
+    delete assets["fonts/MyCjkFont.ttf"];
+    const p = buildProject(assets);
+    try {
+      // 全工程文本改为韩文，避免残留中文掩盖谚文缺字
+      p.writeJson("System.json", (d) => {
+        d["gameTitle"] = "한국어 게임";
+      });
+      p.writeJson("Map001.json", (d) => {
+        const ev1 = (d["events"] as Array<Record<string, unknown> | null>)[1]!;
+        const page = (ev1["pages"] as Array<Record<string, unknown>>)[0]!;
+        const line = (page["list"] as Array<Record<string, unknown>>).find((c) => c["code"] === 401)!;
+        line["parameters"] = ["안녕하세요 세계"];
+      });
+      expect(run(p.loaded()).sections.filter((s) => s.type === "font-check")).toHaveLength(1);
+    } finally {
+      p.destroy();
+    }
+  });
+
+  it("韩文（谚文）按全角计宽 → 超长才报 text-overflow", () => {
+    const p = buildProject(fullAssets());
+    try {
+      p.writeJson("Map001.json", (d) => {
+        const ev1 = (d["events"] as Array<Record<string, unknown> | null>)[1]!;
+        const page = (ev1["pages"] as Array<Record<string, unknown>>)[0]!;
+        (page["list"] as Array<Record<string, unknown>>).splice(
+          -1,
+          0,
+          { code: 101, indent: 0, parameters: ["", 0, 0, 2] },
+          // 42 个谚文音节：按全角 28px 计 = 1176px > 可用 780px → 报；
+          // 若按半角计（14px）只有 588px，不会报——故本条同时证明谚文被当作全角。
+          { code: 401, indent: 1, parameters: ["가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하"] },
+        );
+      });
+      const hit = run(p.loaded()).sections.filter((s) => s.type === "text-overflow");
+      expect(hit).toHaveLength(1);
+      const { evidence } = hit[0]!;
+      if (evidence === null || typeof evidence !== "object" || !("width" in evidence)) {
+        throw new Error("text-overflow 报告缺少 width 证据");
+      }
+      expect(evidence.width).toBe(42 * 28);
+    } finally {
+      p.destroy();
+    }
+  });
+
+  it("CJK 计宽单位与容量一致：25 个全角字（700px < 780px）不误报", () => {
+    const p = buildProject(fullAssets());
+    try {
+      p.writeJson("Map001.json", (d) => {
+        const ev1 = (d["events"] as Array<Record<string, unknown> | null>)[1]!;
+        const page = (ev1["pages"] as Array<Record<string, unknown>>)[0]!;
+        (page["list"] as Array<Record<string, unknown>>).splice(
+          -1,
+          0,
+          { code: 101, indent: 0, parameters: ["", 0, 0, 2] },
+          // 25 个全角字 = 700px，仍在 816 窗口内（可用 780px）→ 不得报。
+          // 修复前容量按“字数”计（27）却拿“半角单位宽度”（50）比较，必然误报。
+          { code: 401, indent: 1, parameters: ["一二三四五六七八九十一二三四五六七八九十一二三四五"] },
+        );
+      });
+      const hit = run(p.loaded()).sections.filter((s) => s.type === "text-overflow");
+      expect(hit).toEqual([]);
+    } finally {
+      p.destroy();
+    }
+  });
+
   it("插件抛异常 → 记录错误，其余检查器照跑（内核隔离）", () => {
     const p = buildProject(fullAssets());
     try {

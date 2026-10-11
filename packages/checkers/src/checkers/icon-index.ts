@@ -3,6 +3,7 @@
  * IconSet 缺失时（iconCount=0）跳过，不产生噪音。
  */
 import { type CheckerPlugin, type GameUniverse, type IRDocument, type ReportSection } from "@rmtest/core";
+import { core } from "../i18n/core.ts";
 
 export const iconIndexChecker: CheckerPlugin = {
   manifest: { name: "icon-index", version: "0.1.0", irVersion: 1, facts: ["universe"] },
@@ -18,7 +19,7 @@ export const iconIndexChecker: CheckerPlugin = {
           severity: "error",
           confidence: "high",
           location: { dataKey, dataId },
-          message: `图标索引 ${iconIndex} 越界（IconSet 共 ${universe.iconCount} 个图标）: ${name}`,
+          ...core("checker.core.iconIndexOutOfRange", { iconIndex, iconCount: universe.iconCount, name }),
           evidence: { iconIndex, iconCount: universe.iconCount },
         });
       }

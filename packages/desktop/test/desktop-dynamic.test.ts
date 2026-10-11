@@ -16,6 +16,15 @@ async function click(page: Page, selector: string): Promise<void> {
   }, selector);
 }
 
+/** 切换界面语言（触发 renderer 的 change 监听） */
+async function setLang(page: Page, lang: string): Promise<void> {
+  await page.evaluate((value) => {
+    const select = document.getElementById("langSelect") as HTMLSelectElement;
+    select.value = value;
+    select.dispatchEvent(new Event("change"));
+  }, lang);
+}
+
 let browser: Browser;
 let page: Page;
 let proc: Parameters<typeof closeCdp>[0]["proc"] | undefined;
@@ -62,6 +71,9 @@ beforeAll(async () => {
     if (Date.now() > deadline) throw new Error("桌面窗口未就绪");
     await new Promise((r) => setTimeout(r, 300));
   }
+  // 断言的是中文文案：固定为 zh，抵消上次运行遗留的 localStorage
+  await page.waitForFunction(() => document.getElementById("langSelect")?.children.length === 4, { timeout: 20_000 });
+  await setLang(page, "zh");
 }, 120_000);
 
 afterAll(async () => {

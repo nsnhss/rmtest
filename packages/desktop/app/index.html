@@ -6,6 +6,9 @@
   <style>
     body { font-family: "Segoe UI", "Microsoft YaHei", sans-serif; margin: 20px; color: #222; }
     h1 { font-size: 18px; }
+    header { display: flex; align-items: baseline; gap: 10px; }
+    header h1 { margin: 0; }
+    header select { padding: 2px 6px; }
     section { border: 1px solid #ddd; border-radius: 6px; padding: 12px 16px; margin-bottom: 16px; }
     h2 { font-size: 15px; margin: 0 0 8px; }
     input[type="text"] { width: 360px; padding: 4px 6px; margin-right: 8px; }
@@ -16,74 +19,83 @@
   </style>
 </head>
 <body>
-  <h1>rmtest — RPG Maker 自动化 bug 检测器</h1>
+  <header>
+    <h1 data-i18n="ui.app.title">rmtest — RPG Maker 自动化 bug 检测器</h1>
+    <label for="langSelect" data-i18n="ui.lang.label">语言</label>
+    <select id="langSelect">
+      <option value="zh">中文</option>
+      <option value="ja">日本語</option>
+      <option value="ko">한국어</option>
+      <option value="en">English</option>
+    </select>
+  </header>
 
   <section>
-    <h2>静态扫描</h2>
-    <input type="text" id="scanDir" placeholder="MV/MZ 工程目录">
-    <button id="scanBtn">扫描</button>
+    <h2 data-i18n="ui.section.scan">静态扫描</h2>
+    <input type="text" id="scanDir" data-i18n-placeholder="ui.placeholder.mvProject" placeholder="MV/MZ 工程目录">
+    <button id="scanBtn" data-i18n="ui.btn.scan">扫描</button>
     <div class="result" id="scanResult"></div>
     <iframe id="reportFrame" hidden></iframe>
   </section>
 
   <section>
-    <h2>语料维护（fresh/broken/stale + 重链）</h2>
-    <input type="text" id="maintainDir" placeholder="工程目录">
-    <input type="text" id="corpusPath" placeholder="corpus.json 路径">
-    <label><input type="checkbox" id="apply"> 写回重链结果</label>
-    <button id="maintainBtn">维护</button>
+    <h2 data-i18n="ui.section.maintain">语料维护（fresh/broken/stale + 重链）</h2>
+    <input type="text" id="maintainDir" data-i18n-placeholder="ui.placeholder.projectDir" placeholder="工程目录">
+    <input type="text" id="corpusPath" data-i18n-placeholder="ui.placeholder.corpusPath" placeholder="corpus.json 路径">
+    <label><input type="checkbox" id="apply"> <span data-i18n="ui.label.applyRelink">写回重链结果</span></label>
+    <button id="maintainBtn" data-i18n="ui.btn.maintain">维护</button>
     <pre class="result" id="maintainResult"></pre>
   </section>
 
   <section>
-    <h2>新内容检测（可达事件页 diff）</h2>
-    <input type="text" id="contentDir" placeholder="工程目录">
-    <input type="text" id="baselinePath" placeholder="基线 JSON（可选）">
-    <button id="contentBtn">检测</button>
+    <h2 data-i18n="ui.section.content">新内容检测（可达事件页 diff）</h2>
+    <input type="text" id="contentDir" data-i18n-placeholder="ui.placeholder.projectDir" placeholder="工程目录">
+    <input type="text" id="baselinePath" data-i18n-placeholder="ui.placeholder.baselineJson" placeholder="基线 JSON（可选）">
+    <button id="contentBtn" data-i18n="ui.btn.detect">检测</button>
     <pre class="result" id="contentResult"></pre>
   </section>
 
   <section>
-    <h2>AI 场景生成（本地 Ollama）</h2>
-    <input type="text" id="aiDir" placeholder="工程目录">
-    <input type="text" id="aiPrompt" placeholder="测试需求，如：测试屠龙任务的完整流程">
-    <button id="aiBtn">生成场景</button>
+    <h2 data-i18n="ui.section.ai">AI 场景生成（本地 Ollama）</h2>
+    <input type="text" id="aiDir" data-i18n-placeholder="ui.placeholder.projectDir" placeholder="工程目录">
+    <input type="text" id="aiPrompt" data-i18n-placeholder="ui.placeholder.aiPrompt" placeholder="测试需求，如：测试屠龙任务的完整流程">
+    <button id="aiBtn" data-i18n="ui.btn.generateScenario">生成场景</button>
     <pre class="result" id="aiResult"></pre>
   </section>
 
   <section>
-    <h2>场景库（回归语料）</h2>
-    <input type="text" id="corpusDir" placeholder="工程目录">
-    <input type="text" id="corpusAddPath" placeholder="场景 JSON 路径（入库）">
-    <button id="corpusAddBtn">入库</button>
-    <button id="corpusListBtn">列出</button>
+    <h2 data-i18n="ui.section.corpus">场景库（回归语料）</h2>
+    <input type="text" id="corpusDir" data-i18n-placeholder="ui.placeholder.projectDir" placeholder="工程目录">
+    <input type="text" id="corpusAddPath" data-i18n-placeholder="ui.placeholder.scenarioJsonPath" placeholder="场景 JSON 路径（入库）">
+    <button id="corpusAddBtn" data-i18n="ui.btn.addToCorpus">入库</button>
+    <button id="corpusListBtn" data-i18n="ui.btn.list">列出</button>
     <pre class="result" id="corpusResult"></pre>
   </section>
 
   <section>
-    <h2>运行中心（一键回归）</h2>
-    <input type="text" id="regressDir" placeholder="工程目录">
-    <button id="regressBtn">回归全部场景</button>
+    <h2 data-i18n="ui.section.runCenter">运行中心（一键回归）</h2>
+    <input type="text" id="regressDir" data-i18n-placeholder="ui.placeholder.projectDir" placeholder="工程目录">
+    <button id="regressBtn" data-i18n="ui.btn.regressAll">回归全部场景</button>
     <pre class="result" id="regressResult"></pre>
   </section>
 
   <section>
-    <h2>覆盖与趋势（可视化）</h2>
-    <input type="text" id="vizDir" placeholder="工程目录">
-    <button id="coverageBtn">覆盖地图</button>
-    <button id="trendsBtn">回归趋势</button>
+    <h2 data-i18n="ui.section.viz">覆盖与趋势（可视化）</h2>
+    <input type="text" id="vizDir" data-i18n-placeholder="ui.placeholder.projectDir" placeholder="工程目录">
+    <button id="coverageBtn" data-i18n="ui.btn.coverageMap">覆盖地图</button>
+    <button id="trendsBtn" data-i18n="ui.btn.trends">回归趋势</button>
     <pre class="result" id="vizResult"></pre>
   </section>
 
   <section>
-    <h2>动态测试（真实引擎）</h2>
-    <input type="text" id="dynDir" placeholder="工程目录">
-    <input type="text" id="dynArg" placeholder="golden 标签 / fuzz 种子（可选）">
-    <button id="fuzzBtn">fuzz 探索</button>
-    <button id="goldenApproveBtn">golden 批准</button>
-    <button id="goldenCheckBtn">golden 对比</button>
-    <button id="recordStartBtn">开始录制</button>
-    <button id="recordStopBtn">停止并保存</button>
+    <h2 data-i18n="ui.section.dynamic">动态测试（真实引擎）</h2>
+    <input type="text" id="dynDir" data-i18n-placeholder="ui.placeholder.projectDir" placeholder="工程目录">
+    <input type="text" id="dynArg" data-i18n-placeholder="ui.placeholder.dynArg" placeholder="golden 标签 / fuzz 种子（可选）">
+    <button id="fuzzBtn" data-i18n="ui.btn.fuzz">fuzz 探索</button>
+    <button id="goldenApproveBtn" data-i18n="ui.btn.goldenApprove">golden 批准</button>
+    <button id="goldenCheckBtn" data-i18n="ui.btn.goldenCheck">golden 对比</button>
+    <button id="recordStartBtn" data-i18n="ui.btn.recordStart">开始录制</button>
+    <button id="recordStopBtn" data-i18n="ui.btn.recordStop">停止并保存</button>
     <pre class="result" id="dynResult"></pre>
   </section>
 

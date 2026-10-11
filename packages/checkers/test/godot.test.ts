@@ -147,6 +147,35 @@ describe("Godot 检查器", () => {
     }
   });
 
+  it('get_node(^"X") 是 NodePath 简写 → 按相对路径解析，不报缺祖先', () => {
+    const dir = buildProject({
+      "project.godot": '[application]\nrun/main_scene="res://scenes/main.tscn"\n',
+      "scenes/main.tscn": [
+        '[gd_scene format=3]',
+        '[ext_resource type="Script" path="res://scripts/main.gd" id="1_a"]',
+        '[node name="Main" type="Node2D"]',
+        'script = ExtResource("1_a")',
+        '[node name="Sprite" type="Sprite2D" parent="."]',
+      ].join("\n"),
+      "scripts/main.gd": [
+        "extends Node2D",
+        "",
+        "func _ready():",
+        '\tget_node(^"Sprite").visible = true',
+        '\tget_node(^"Missing").queue_free()',
+        "",
+      ].join("\n"),
+    });
+    try {
+      const paths = run(dir).sections.filter((s) => s.type === "godot-node-path");
+      // ^"Sprite" 是存在的直接子节点 → 不报；^"Missing" 确实缺失 → 仍报
+      expect(paths).toHaveLength(1);
+      expect(paths[0]!.message).toContain("Missing");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("未设置主场景 → 无法启动报告", () => {
     const dir = buildProject({
       "project.godot": '[application]\nconfig/name="x"\n',

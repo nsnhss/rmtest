@@ -4,6 +4,8 @@
  * 命令名与参数键依据 chrismaltby/gb-studio 的 src/lib/events/ 事件定义实证。
  */
 import type { CheckerPlugin, IRGBSScriptEvent, IRGBSSection, ReportSection } from "@rmtest/core";
+import type { LocalizableMessage } from "@rmtest/i18n";
+import { gbs } from "../i18n/gbs.ts";
 
 type GSection = IRGBSSection;
 
@@ -13,10 +15,18 @@ function sec(
   type: string,
   severity: ReportSection["severity"],
   confidence: ReportSection["confidence"],
-  message: string,
+  message: LocalizableMessage,
   evidence?: unknown,
 ): ReportSection {
-  return { type, severity, confidence, message, evidence };
+  return {
+    type,
+    severity,
+    confidence,
+    message: message.message,
+    messageId: message.messageId,
+    messageParams: message.messageParams,
+    evidence,
+  };
 }
 
 /* ---- 命令分类与哨兵值 ---- */
@@ -118,119 +128,121 @@ export const gbsBrokenRefChecker: CheckerPlugin = {
     if (!t) return NO_SECTIONS;
     const out: ReportSection[] = [];
     const scenesById = new Map(t.scenes.map((s) => [s.id, s]));
-    const ev = (msg: string, extra?: unknown) =>
-      sec("gbs-broken-ref", "error", "high", msg, extra);
+    const ev = (message: LocalizableMessage, extra?: unknown) =>
+      sec("gbs-broken-ref", "error", "high", message, extra);
 
-    const checkGlobal = (e: IRGBSScriptEvent, where: string) => {
+    const checkGlobal = (e: IRGBSScriptEvent, where: LocalizableMessage) => {
       const { command, args } = e;
       if (SCENE_CMDS.has(command)) {
         const sid = refValue(args["sceneId"]);
         if (sid && sid !== "LAST_SCENE" && !scenesById.has(sid)) {
-          out.push(ev(`${where}：${command} 场景 ${sid} 不存在`));
+          out.push(ev(gbs("checker.gbs.sceneRefMissing", { where, command, id: sid })));
         }
       } else if (SPRITE_CMDS.has(command)) {
         const sid = refValue(args["spriteSheetId"]);
         if (sid && sid !== "LAST_SPRITE" && !t.spriteIds.includes(sid)) {
-          out.push(ev(`${where}：${command} 行走图 ${sid} 不存在`));
+          out.push(ev(gbs("checker.gbs.spriteRefMissing", { where, command, id: sid })));
         }
       } else if (MUSIC_CMDS.has(command)) {
         const mid = refValue(args["musicId"]);
         if (mid && mid !== "LAST_MUSIC" && !t.musicIds.includes(mid)) {
-          out.push(ev(`${where}：${command} 音乐 ${mid} 不存在`));
+          out.push(ev(gbs("checker.gbs.musicRefMissing", { where, command, id: mid })));
         }
       } else if (SOUND_CMDS.has(command)) {
         const sid = refValue(args["type"]);
         if (sid && !SOUND_BUILTINS.has(sid) && !t.soundIds.includes(sid)) {
-          out.push(ev(`${where}：${command} 音效 ${sid} 不存在`));
+          out.push(ev(gbs("checker.gbs.soundRefMissing", { where, command, id: sid })));
         }
       } else if (EMOTE_CMDS.has(command)) {
         const eid = refValue(args["emoteId"]);
         if (eid && !t.emoteIds.includes(eid)) {
-          out.push(ev(`${where}：${command} 表情 ${eid} 不存在`));
+          out.push(ev(gbs("checker.gbs.emoteRefMissing", { where, command, id: eid })));
         }
       } else if (FONT_CMDS.has(command)) {
         const fid = refValue(args["fontId"]);
         if (fid && !t.fontIds.includes(fid)) {
-          out.push(ev(`${where}：${command} 字体 ${fid} 不存在`));
+          out.push(ev(gbs("checker.gbs.fontRefMissing", { where, command, id: fid })));
         }
       } else if (AVATAR_CMDS.has(command)) {
         const aid = refValue(args["avatarId"]);
         if (aid && !t.avatarIds.includes(aid)) {
-          out.push(ev(`${where}：${command} 头像 ${aid} 不存在`));
+          out.push(ev(gbs("checker.gbs.avatarRefMissing", { where, command, id: aid })));
         }
       } else if (PALETTE_CMDS.has(command)) {
         const pid = refValue(args["paletteId"]);
         if (pid && !t.paletteIds.includes(pid)) {
-          out.push(ev(`${where}：${command} 调色板 ${pid} 不存在`));
+          out.push(ev(gbs("checker.gbs.paletteRefMissing", { where, command, id: pid })));
         }
       }
     };
 
-    const checkActor = (e: IRGBSScriptEvent, where: string, sceneActorIds: Set<string>) => {
+    const checkActor = (e: IRGBSScriptEvent, where: LocalizableMessage, sceneActorIds: Set<string>) => {
       const aid = refValue(e.args["actorId"]);
       if (aid && !sceneActorIds.has(aid)) {
-        out.push(ev(`${where}：${e.command} 演员 ${aid} 不在场景内`));
+        out.push(ev(gbs("checker.gbs.actorRefMissing", { where, command: e.command, id: aid })));
       }
       if (OTHER_ACTOR_CMDS.has(e.command)) {
         const oid = refValue(e.args["otherActorId"]);
         if (oid && !sceneActorIds.has(oid)) {
-          out.push(ev(`${where}：${e.command} 参照演员 ${oid} 不在场景内`));
+          out.push(ev(gbs("checker.gbs.otherActorRefMissing", { where, command: e.command, id: oid })));
         }
       }
       checkGlobal(e, where);
     };
 
     for (const s of t.scenes) {
-      const where0 = `场景 ${sceneTitle(s)}`;
+      const where0 = gbs("checker.gbs.locationScene", { scene: sceneTitle(s) });
       const sceneActorIds = new Set(s.actors.map((a) => a.id));
       // 结构引用
       if (s.backgroundId && !t.backgroundIds.includes(s.backgroundId)) {
-        out.push(ev(`${where0}：背景 ${s.backgroundId} 不存在`));
+        out.push(ev(gbs("checker.gbs.backgroundMissing", { where: where0, id: s.backgroundId })));
       }
       if (s.tilesetId && !t.tilesetIds.includes(s.tilesetId)) {
-        out.push(ev(`${where0}：图块集 ${s.tilesetId} 不存在`));
+        out.push(ev(gbs("checker.gbs.tilesetMissing", { where: where0, id: s.tilesetId })));
       }
       for (const pid of s.paletteIds) {
-        if (pid && !t.paletteIds.includes(pid)) out.push(ev(`${where0}：调色板 ${pid} 不存在`));
+        if (pid && !t.paletteIds.includes(pid)) out.push(ev(gbs("checker.gbs.paletteMissing", { where: where0, id: pid })));
       }
       for (const pid of s.spritePaletteIds) {
-        if (pid && !t.paletteIds.includes(pid)) out.push(ev(`${where0}：角色调色板 ${pid} 不存在`));
+        if (pid && !t.paletteIds.includes(pid)) out.push(ev(gbs("checker.gbs.spritePaletteMissing", { where: where0, id: pid })));
       }
       if (s.playerSpriteSheetId && s.playerSpriteSheetId !== "LAST_SPRITE" && !t.spriteIds.includes(s.playerSpriteSheetId)) {
-        out.push(ev(`${where0}：玩家行走图 ${s.playerSpriteSheetId} 不存在`));
+        out.push(ev(gbs("checker.gbs.playerSpriteMissing", { where: where0, id: s.playerSpriteSheetId })));
       }
       for (const a of s.actors) {
-        const where = `${where0} · 演员 ${a.name || a.id}`;
+        const where = gbs("checker.gbs.locationActor", { scene: sceneTitle(s), actor: a.name || a.id });
         if (a.spriteSheetId && a.spriteSheetId !== "LAST_SPRITE" && !t.spriteIds.includes(a.spriteSheetId)) {
-          out.push(ev(`${where}：行走图 ${a.spriteSheetId} 不存在`));
+          out.push(ev(gbs("checker.gbs.actorSpriteMissing", { where, id: a.spriteSheetId })));
         }
         if (a.paletteId && !t.paletteIds.includes(a.paletteId)) {
-          out.push(ev(`${where}：调色板 ${a.paletteId} 不存在`));
+          out.push(ev(gbs("checker.gbs.paletteMissing", { where, id: a.paletteId })));
         }
         if (a.prefabId && !t.actorPrefabIds.includes(a.prefabId)) {
-          out.push(ev(`${where}：演员预制件 ${a.prefabId} 不存在`));
+          out.push(ev(gbs("checker.gbs.actorPrefabMissing", { where, id: a.prefabId })));
         }
         for (const set of a.scripts) {
-          walkEvents(set.events, (e) => checkActor(e, `${where} · ${set.key}`, sceneActorIds));
+          walkEvents(set.events, (e) => checkActor(e, gbs("checker.gbs.locationScript", { where, key: set.key }), sceneActorIds));
         }
       }
       for (const tr of s.triggers) {
-        const where = `${where0} · 触发器 ${tr.name || tr.id}`;
+        const where = gbs("checker.gbs.locationTrigger", { scene: sceneTitle(s), trigger: tr.name || tr.id });
         if (tr.prefabId && !t.triggerPrefabIds.includes(tr.prefabId)) {
-          out.push(ev(`${where}：触发器预制件 ${tr.prefabId} 不存在`));
+          out.push(ev(gbs("checker.gbs.triggerPrefabMissing", { where, id: tr.prefabId })));
         }
         for (const set of tr.scripts) {
-          walkEvents(set.events, (e) => checkActor(e, `${where} · ${set.key}`, sceneActorIds));
+          walkEvents(set.events, (e) => checkActor(e, gbs("checker.gbs.locationScript", { where, key: set.key }), sceneActorIds));
         }
       }
       for (const set of s.scripts) {
-        walkEvents(set.events, (e) => checkActor(e, `${where0} · ${set.key}`, sceneActorIds));
+        walkEvents(set.events, (e) =>
+          checkActor(e, gbs("checker.gbs.locationScript", { where: where0, key: set.key }), sceneActorIds),
+        );
       }
     }
 
     // 自定义事件：只核对全局资源（演员引用依赖调用场景，静态不可解）
     for (const ce of t.customEvents) {
-      const where = `自定义事件 ${ce.name || ce.id}`;
+      const where = gbs("checker.gbs.locationCustomEvent", { name: ce.name || ce.id });
       walkEvents(ce.script, (e) => checkGlobal(e, where));
     }
 
@@ -245,7 +257,16 @@ export const gbsStartSceneChecker: CheckerPlugin = {
     const t = ir.gbs;
     if (!t) return NO_SECTIONS;
     if (!t.scenes.some((s) => s.id === t.startSceneId)) {
-      return [sec("gbs-start-scene", "error", "high", `起始场景 ${t.startSceneId || "(未设置)"} 不存在，游戏无法启动`)];
+      return [
+        sec(
+          "gbs-start-scene",
+          "error",
+          "high",
+          t.startSceneId
+            ? gbs("checker.gbs.startSceneMissing", { id: t.startSceneId })
+            : gbs("checker.gbs.startSceneNotSet"),
+        ),
+      ];
     }
     return NO_SECTIONS;
   },
@@ -274,7 +295,7 @@ export const gbsCollisionSoftlockChecker: CheckerPlugin = {
           "gbs-collision-softlock",
           "error",
           "high",
-          `起始场景 ${sceneTitle(startScene)} 的起始位置 (${t.startX}, ${t.startY}) 在实心瓦片上，玩家出生即卡死`,
+          gbs("checker.gbs.startPositionSolid", { scene: sceneTitle(startScene), x: t.startX, y: t.startY }),
         ),
       );
     }
@@ -288,13 +309,18 @@ export const gbsCollisionSoftlockChecker: CheckerPlugin = {
               "gbs-collision-softlock",
               "error",
               "high",
-              `场景 ${sceneTitle(s)} 演员 ${a.name || a.id} 初始位置 (${a.x}, ${a.y}) 在实心瓦片上`,
+              gbs("checker.gbs.actorSpawnSolid", {
+                where: gbs("checker.gbs.locationScene", { scene: sceneTitle(s) }),
+                actor: a.name || a.id,
+                x: a.x,
+                y: a.y,
+              }),
             ),
           );
         }
       }
       // 场景切换传送目标
-      const where = `场景 ${sceneTitle(s)}`;
+      const where = gbs("checker.gbs.locationScene", { scene: sceneTitle(s) });
       const visit = (e: IRGBSScriptEvent, path: string) => {
         if (!SCENE_CMDS.has(e.command)) return;
         const sid = refValue(e.args["sceneId"]);
@@ -310,7 +336,14 @@ export const gbsCollisionSoftlockChecker: CheckerPlugin = {
               "gbs-collision-softlock",
               "error",
               "high",
-              `${where} 脚本 ${path}：${e.command} 传送到场景 ${sceneTitle(target)} 的 (${x}, ${y})，该瓦片实心 → 软锁`,
+              gbs("checker.gbs.transferSolid", {
+                where,
+                path,
+                command: e.command,
+                scene: sceneTitle(target),
+                x,
+                y,
+              }),
             ),
           );
         }
@@ -349,6 +382,7 @@ export const gbsCollisionSoftlockChecker: CheckerPlugin = {
       }
       if (seen.size === 0) continue; // 非起始场景或无可行区域
       const reachable = (x: number, y: number) => seen.has(y * s.width + x);
+      const where = gbs("checker.gbs.locationScene", { scene: sceneTitle(s) });
       for (const tr of s.triggers) {
         let hit = false;
         for (let dy = 0; dy < tr.height && !hit; dy++) {
@@ -362,7 +396,7 @@ export const gbsCollisionSoftlockChecker: CheckerPlugin = {
               "gbs-collision-softlock",
               "info",
               "low",
-              `场景 ${sceneTitle(s)} 触发器 ${tr.name || tr.id} 从起始位置不可达（可能由传送/事件移动激活）`,
+              gbs("checker.gbs.triggerUnreachable", { where, trigger: tr.name || tr.id }),
             ),
           );
         }
@@ -374,7 +408,7 @@ export const gbsCollisionSoftlockChecker: CheckerPlugin = {
               "gbs-collision-softlock",
               "info",
               "low",
-              `场景 ${sceneTitle(s)} 演员 ${a.name || a.id} 从起始位置不可达`,
+              gbs("checker.gbs.actorUnreachable", { where, actor: a.name || a.id }),
             ),
           );
         }
@@ -396,10 +430,10 @@ export const gbsMissingAssetChecker: CheckerPlugin = {
       if (a.exists) continue;
       if (a.caseInsensitiveMatch) {
         out.push(
-          sec("gbs-missing-asset", "warning", "low", `资产 ${a.filename} 存在但文件名大小写不一致`, { id: a.id }),
+          sec("gbs-missing-asset", "warning", "low", gbs("checker.gbs.assetCaseMismatch", { file: a.filename }), { id: a.id }),
         );
       } else {
-        out.push(sec("gbs-missing-asset", "error", "high", `资产 ${a.filename} 缺失`, { id: a.id }));
+        out.push(sec("gbs-missing-asset", "error", "high", gbs("checker.gbs.assetMissing", { file: a.filename }), { id: a.id }));
       }
     }
     return out;
@@ -414,7 +448,7 @@ export const gbsLabelMissingChecker: CheckerPlugin = {
     if (!t) return NO_SECTIONS;
     const out: ReportSection[] = [];
 
-    const checkSet = (events: IRGBSScriptEvent[], where: string) => {
+    const checkSet = (events: IRGBSScriptEvent[], where: LocalizableMessage) => {
       const defined = new Set<string>();
       walkEvents(events, (e) => {
         if (LABEL_DEFINE_CMDS.has(e.command)) {
@@ -426,18 +460,32 @@ export const gbsLabelMissingChecker: CheckerPlugin = {
         if (!LABEL_GOTO_CMDS.has(e.command)) return;
         const label = refValue(e.args["label"]);
         if (label && !defined.has(label)) {
-          out.push(sec("gbs-label-missing", "error", "high", `${where}：EVENT_GOTO_LABEL 标签 "${label}" 未定义`));
+          out.push(sec("gbs-label-missing", "error", "high", gbs("checker.gbs.labelMissing", { where, label })));
         }
       });
     };
 
     for (const s of t.scenes) {
-      const where0 = `场景 ${sceneTitle(s)}`;
-      for (const set of s.scripts) checkSet(set.events, `${where0} · ${set.key}`);
-      for (const a of s.actors) for (const set of a.scripts) checkSet(set.events, `${where0} · 演员 ${a.name || a.id} · ${set.key}`);
-      for (const tr of s.triggers) for (const set of tr.scripts) checkSet(set.events, `${where0} · 触发器 ${tr.name || tr.id} · ${set.key}`);
+      const where0 = gbs("checker.gbs.locationScene", { scene: sceneTitle(s) });
+      for (const set of s.scripts) {
+        checkSet(set.events, gbs("checker.gbs.locationScript", { where: where0, key: set.key }));
+      }
+      for (const a of s.actors) {
+        const where = gbs("checker.gbs.locationActor", { scene: sceneTitle(s), actor: a.name || a.id });
+        for (const set of a.scripts) {
+          checkSet(set.events, gbs("checker.gbs.locationScript", { where, key: set.key }));
+        }
+      }
+      for (const tr of s.triggers) {
+        const where = gbs("checker.gbs.locationTrigger", { scene: sceneTitle(s), trigger: tr.name || tr.id });
+        for (const set of tr.scripts) {
+          checkSet(set.events, gbs("checker.gbs.locationScript", { where, key: set.key }));
+        }
+      }
     }
-    for (const ce of t.customEvents) checkSet(ce.script, `自定义事件 ${ce.name || ce.id}`);
+    for (const ce of t.customEvents) {
+      checkSet(ce.script, gbs("checker.gbs.locationCustomEvent", { name: ce.name || ce.id }));
+    }
 
     return out;
   },

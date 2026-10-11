@@ -1,6 +1,9 @@
 /**
  * 渲染进程 UI 逻辑 —— 只做两件事：读输入 → 调 window.api → 渲染结果。
+ * 界面语言可切换（zh/ja/ko/en）：静态外壳走 data-i18n，结果串走目录查表。
  */
+import { LOCALES, LOCALE_LABELS, resolveLocale, setLocale, t, type Locale } from "@rmtest/i18n";
+
 interface ScanResult {
   counts: { error: number; warning: number; info: number };
   reportUrl: string;
@@ -26,20 +29,20 @@ interface ContentResult {
 }
 
 interface Api {
-  scan: (dir: string) => Promise<ScanResult>;
-  maintain: (dir: string, corpusPath: string, apply: boolean) => Promise<MaintainResult>;
-  content: (dir: string, baselinePath: string | null) => Promise<ContentResult>;
-  aigen: (dir: string, nl: string) => Promise<{ scenarioJson: string | null; attempts: number; feedback: string[]; error: string | null }>;
-  corpusList: (dir: string) => Promise<{ entries: Array<{ id: string; status: string; issues: string[] }>; count: number }>;
-  corpusAdd: (dir: string, scenarioPath: string) => Promise<{ id: string; steps: number }>;
-  regress: (dir: string) => Promise<{ passed: number; failed: number; skipped: number; details: string[] }>;
-  coverage: (dir: string) => Promise<{ total: number; covered: number; maps: Array<{ mapId: number; name: string; covered: boolean }> }>;
-  trends: (dir: string) => Promise<{ rows: Array<{ day: string; passed: number; failed: number }> }>;
-  fuzz: (dir: string, opts: { seed?: number }) => Promise<{ steps: number; novelStates: number; crashes: string[] }>;
-  goldenApprove: (dir: string, tag: string) => Promise<{ ok: boolean; tag: string }>;
-  goldenCheck: (dir: string, tag: string) => Promise<{ tag: string; diffRatio: number; comparable: boolean }>;
-  recordStart: (dir: string) => Promise<{ ok?: boolean; error?: string }>;
-  recordStop: () => Promise<{ ok?: boolean; error?: string; path?: string; steps?: number }>;
+  scan: (dir: string, locale: Locale) => Promise<ScanResult>;
+  maintain: (dir: string, corpusPath: string, apply: boolean, locale: Locale) => Promise<MaintainResult>;
+  content: (dir: string, baselinePath: string | null, locale: Locale) => Promise<ContentResult>;
+  aigen: (dir: string, nl: string, locale: Locale) => Promise<{ scenarioJson: string | null; attempts: number; feedback: string[]; error: string | null }>;
+  corpusList: (dir: string, locale: Locale) => Promise<{ entries: Array<{ id: string; status: string; issues: string[] }>; count: number }>;
+  corpusAdd: (dir: string, scenarioPath: string, locale: Locale) => Promise<{ id: string; steps: number }>;
+  regress: (dir: string, locale: Locale) => Promise<{ passed: number; failed: number; skipped: number; details: string[] }>;
+  coverage: (dir: string, locale: Locale) => Promise<{ total: number; covered: number; maps: Array<{ mapId: number; name: string; covered: boolean }> }>;
+  trends: (dir: string, locale: Locale) => Promise<{ rows: Array<{ day: string; passed: number; failed: number }> }>;
+  fuzz: (dir: string, opts: { seed?: number }, locale: Locale) => Promise<{ steps: number; novelStates: number; crashes: string[] }>;
+  goldenApprove: (dir: string, tag: string, locale: Locale) => Promise<{ ok: boolean; tag: string }>;
+  goldenCheck: (dir: string, tag: string, locale: Locale) => Promise<{ tag: string; diffRatio: number; comparable: boolean }>;
+  recordStart: (dir: string, locale: Locale) => Promise<{ ok?: boolean; error?: string }>;
+  recordStop: (locale: Locale) => Promise<{ ok?: boolean; error?: string; path?: string; steps?: number }>;
 }
 
 declare global {
@@ -54,23 +57,73 @@ function byId(id: string): HTMLInputElement | HTMLButtonElement | HTMLElement {
 
 const api = window.api;
 
+// —— 语言：初始解析 → 静态外壳翻译 → 选择器切换 ——
+const LANG_STORAGE_KEY = "rmtestLang";
+
+const langSelect = byId("langSelect") as HTMLSelectElement;
+let storedLang: string | null = null;
+try {
+  storedLang = localStorage.getItem(LANG_STORAGE_KEY);
+} catch {
+  // 无存储权限（沙箱异常）时退回系统语言
+}
+let locale: Locale = storedLang ? resolveLocale(storedLang) : resolveLocale();
+
+/** 用 LOCALE_LABELS 重建选项：自称不随当前语言变化 */
+function renderLangOptions(): void {
+  langSelect.replaceChildren();
+  for (const key of LOCALES) {
+    const option = document.createElement("option");
+    option.value = key;
+    option.textContent = LOCALE_LABELS[key];
+    langSelect.appendChild(option);
+  }
+}
+
+/** 应用一个语言：同步进程态、翻译 data-i18n 外壳、更新 <html lang> */
+function applyLocale(target: Locale): void {
+  locale = target;
+  setLocale(target);
+  for (const el of document.querySelectorAll<HTMLElement>("[data-i18n]")) {
+    el.textContent = t(target, el.dataset["i18n"]!);
+  }
+  for (const el of document.querySelectorAll<HTMLInputElement>("[data-i18n-placeholder]")) {
+    el.placeholder = t(target, el.dataset["i18nPlaceholder"]!);
+  }
+  langSelect.value = target;
+  document.documentElement.lang = target;
+}
+
+renderLangOptions();
+applyLocale(locale);
+
+langSelect.addEventListener("change", () => {
+  const next = resolveLocale(langSelect.value);
+  try {
+    localStorage.setItem(LANG_STORAGE_KEY, next);
+  } catch {
+    // 存不下也无妨，仅本次生效
+  }
+  applyLocale(next);
+});
+
 byId("scanBtn").addEventListener("click", () => {
   const dir = (byId("scanDir") as HTMLInputElement).value.trim();
   const result = byId("scanResult");
   const frame = byId("reportFrame") as HTMLIFrameElement;
   if (!dir) {
-    result.textContent = "请输入工程目录";
+    result.textContent = t(locale, "ui.error.needDir");
     return;
   }
-  result.textContent = "扫描中…";
-  void api.scan(dir).then((r) => {
-    result.textContent = `错误 ${r.counts.error} · 警告 ${r.counts.warning} · 提示 ${r.counts.info}` +
-      (r.loadWarnings > 0 ? ` · 加载警告 ${r.loadWarnings}` : "") +
-      (r.pluginErrors > 0 ? ` · 插件错误 ${r.pluginErrors}` : "");
+  result.textContent = t(locale, "ui.scan.running");
+  void api.scan(dir, locale).then((r) => {
+    result.textContent = t(locale, "ui.scan.summary", { error: r.counts.error, warning: r.counts.warning, info: r.counts.info }) +
+      (r.loadWarnings > 0 ? t(locale, "ui.scan.loadWarnings", { count: r.loadWarnings }) : "") +
+      (r.pluginErrors > 0 ? t(locale, "ui.scan.pluginErrors", { count: r.pluginErrors }) : "");
     frame.src = r.reportUrl;
     frame.hidden = false;
   }).catch((err: Error) => {
-    result.textContent = `扫描失败: ${err.message}`;
+    result.textContent = t(locale, "ui.scan.failed", { error: err.message });
   });
 });
 
@@ -80,24 +133,24 @@ byId("maintainBtn").addEventListener("click", () => {
   const apply = (byId("apply") as HTMLInputElement).checked;
   const out = byId("maintainResult") as HTMLPreElement;
   if (!dir || !corpus) {
-    out.textContent = "请输入工程目录与语料路径";
+    out.textContent = t(locale, "ui.error.needDirAndCorpus");
     return;
   }
-  out.textContent = "维护中…";
-  void api.maintain(dir, corpus, apply).then((r) => {
+  out.textContent = t(locale, "ui.maintain.running");
+  void api.maintain(dir, corpus, apply, locale).then((r) => {
     if (r.error) {
       out.textContent = r.error;
       return;
     }
     const lines = [
-      `fresh ${r.report!.fresh} · broken ${r.report!.broken} · stale ${r.report!.stale}`,
-      ...(r.badEntries ?? []).map((e) => `非法条目: ${e}`),
+      t(locale, "ui.maintain.summary", { fresh: r.report!.fresh, broken: r.report!.broken, stale: r.report!.stale }),
+      ...(r.badEntries ?? []).map((e) => t(locale, "ui.maintain.badEntry", { entry: e })),
       ...(r.details ?? []),
-      `重链 ${r.relinked} · 未决 ${r.unresolved}${r.applied ? " · 已写回语料" : ""}`,
+      t(locale, "ui.maintain.relink", { relinked: r.relinked!, unresolved: r.unresolved! }) + (r.applied ? t(locale, "ui.maintain.applied") : ""),
     ];
     out.textContent = lines.join("\n");
   }).catch((err: Error) => {
-    out.textContent = `维护失败: ${err.message}`;
+    out.textContent = t(locale, "ui.maintain.failed", { error: err.message });
   });
 });
 
@@ -106,21 +159,21 @@ byId("contentBtn").addEventListener("click", () => {
   const baseline = (byId("baselinePath") as HTMLInputElement).value.trim() || null;
   const out = byId("contentResult") as HTMLPreElement;
   if (!dir) {
-    out.textContent = "请输入工程目录";
+    out.textContent = t(locale, "ui.error.needDir");
     return;
   }
-  out.textContent = "检测中…";
-  void api.content(dir, baseline).then((r) => {
-    const lines = [`可达事件页 ${r.total} 个`];
+  out.textContent = t(locale, "ui.content.running");
+  void api.content(dir, baseline, locale).then((r) => {
+    const lines = [t(locale, "ui.content.total", { count: r.total })];
     if (r.hasBaseline) {
-      lines.push(`新增 ${r.added.length} 个（未覆盖，进补测队列）:`, ...r.added.map((k) => `  + ${k}`));
-      lines.push(`删除 ${r.removed.length} 个:`, ...r.removed.map((k) => `  - ${k}`));
+      lines.push(t(locale, "ui.content.added", { count: r.added.length }), ...r.added.map((k) => `  + ${k}`));
+      lines.push(t(locale, "ui.content.removed", { count: r.removed.length }), ...r.removed.map((k) => `  - ${k}`));
     } else {
-      lines.push("无基线（首次运行）");
+      lines.push(t(locale, "ui.content.noBaseline"));
     }
     out.textContent = lines.join("\n");
   }).catch((err: Error) => {
-    out.textContent = `检测失败: ${err.message}`;
+    out.textContent = t(locale, "ui.content.failed", { error: err.message });
   });
 });
 
@@ -129,18 +182,19 @@ byId("aiBtn").addEventListener("click", () => {
   const nl = (byId("aiPrompt") as HTMLInputElement).value.trim();
   const out = byId("aiResult") as HTMLPreElement;
   if (!dir || !nl) {
-    out.textContent = "请输入工程目录与测试需求";
+    out.textContent = t(locale, "ui.error.needDirAndPrompt");
     return;
   }
-  out.textContent = "生成中（本地推理，耐心）…";
-  void api.aigen(dir, nl).then((r) => {
+  out.textContent = t(locale, "ui.aigen.running");
+  void api.aigen(dir, nl, locale).then((r) => {
     if (r.error) {
-      out.textContent = `生成失败（${r.attempts} 次）: ${r.error}\n` + r.feedback.map((f) => `  反馈: ${f}`).join("\n");
+      out.textContent = t(locale, "ui.aigen.failed", { attempts: r.attempts, error: r.error }) + "\n" +
+        r.feedback.map((f) => t(locale, "ui.aigen.feedback", { feedback: f })).join("\n");
       return;
     }
-    out.textContent = r.scenarioJson + `\n（${r.attempts} 次尝试过校验闸门）`;
+    out.textContent = r.scenarioJson + t(locale, "ui.aigen.gatePassed", { attempts: r.attempts });
   }).catch((err: Error) => {
-    out.textContent = `生成失败: ${err.message}`;
+    out.textContent = t(locale, "ui.aigen.failedPlain", { error: err.message });
   });
 });
 
@@ -149,13 +203,13 @@ byId("corpusAddBtn").addEventListener("click", () => {
   const scenarioPath = (byId("corpusAddPath") as HTMLInputElement).value.trim();
   const out = byId("corpusResult") as HTMLPreElement;
   if (!dir || !scenarioPath) {
-    out.textContent = "请输入工程目录与场景 JSON 路径";
+    out.textContent = t(locale, "ui.error.needDirAndScenario");
     return;
   }
-  void api.corpusAdd(dir, scenarioPath).then((r) => {
-    out.textContent = `已入库: ${r.id}（${r.steps} 步）`;
+  void api.corpusAdd(dir, scenarioPath, locale).then((r) => {
+    out.textContent = t(locale, "ui.corpus.added", { id: r.id, steps: r.steps });
   }).catch((err: Error) => {
-    out.textContent = `入库失败: ${err.message}`;
+    out.textContent = t(locale, "ui.corpus.addFailed", { error: err.message });
   });
 });
 
@@ -163,13 +217,19 @@ byId("corpusListBtn").addEventListener("click", () => {
   const dir = (byId("corpusDir") as HTMLInputElement).value.trim();
   const out = byId("corpusResult") as HTMLPreElement;
   if (!dir) {
-    out.textContent = "请输入工程目录";
+    out.textContent = t(locale, "ui.error.needDir");
     return;
   }
-  void api.corpusList(dir).then((r) => {
-    out.textContent = [`语料 ${r.count} 个场景:`, ...r.entries.map((e) => `  [${e.status}] ${e.id}${e.issues.length > 0 ? ` — ${e.issues.join("; ")}` : ""}`)].join("\n");
+  void api.corpusList(dir, locale).then((r) => {
+    out.textContent = [
+      t(locale, "ui.corpus.list", { count: r.count }),
+      ...r.entries.map((e) =>
+        t(locale, "ui.corpus.listItem", { status: e.status, id: e.id }) +
+        (e.issues.length > 0 ? t(locale, "ui.corpus.issueSuffix", { issues: e.issues.join("; ") }) : ""),
+      ),
+    ].join("\n");
   }).catch((err: Error) => {
-    out.textContent = `列出失败: ${err.message}`;
+    out.textContent = t(locale, "ui.corpus.listFailed", { error: err.message });
   });
 });
 
@@ -177,14 +237,14 @@ byId("regressBtn").addEventListener("click", () => {
   const dir = (byId("regressDir") as HTMLInputElement).value.trim();
   const out = byId("regressResult") as HTMLPreElement;
   if (!dir) {
-    out.textContent = "请输入工程目录";
+    out.textContent = t(locale, "ui.error.needDir");
     return;
   }
-  out.textContent = "回归中（启动真实引擎，耐心）…";
-  void api.regress(dir).then((r) => {
-    out.textContent = [...r.details, `通过 ${r.passed} · 失败 ${r.failed} · 跳过 ${r.skipped}`].join("\n");
+  out.textContent = t(locale, "ui.regress.running");
+  void api.regress(dir, locale).then((r) => {
+    out.textContent = [...r.details, t(locale, "ui.regress.summary", { passed: r.passed, failed: r.failed, skipped: r.skipped })].join("\n");
   }).catch((err: Error) => {
-    out.textContent = `回归失败: ${err.message}`;
+    out.textContent = t(locale, "ui.regress.failed", { error: err.message });
   });
 });
 
@@ -192,14 +252,17 @@ byId("coverageBtn").addEventListener("click", () => {
   const dir = (byId("vizDir") as HTMLInputElement).value.trim();
   const out = byId("vizResult") as HTMLPreElement;
   if (!dir) {
-    out.textContent = "请输入工程目录";
+    out.textContent = t(locale, "ui.error.needDir");
     return;
   }
-  void api.coverage(dir).then((r) => {
-    const lines = [`场景覆盖: ${r.covered}/${r.total} 个可达地图`, ...r.maps.map((m) => `  ${m.covered ? "✓" : "✗"} 地图 ${m.mapId} (${m.name})`)];
+  void api.coverage(dir, locale).then((r) => {
+    const lines = [
+      t(locale, "ui.coverage.summary", { covered: r.covered, total: r.total }),
+      ...r.maps.map((m) => t(locale, "ui.coverage.mapLine", { mark: m.covered ? "✓" : "✗", mapId: m.mapId, name: m.name })),
+    ];
     out.textContent = lines.join("\n");
   }).catch((err: Error) => {
-    out.textContent = `覆盖计算失败: ${err.message}`;
+    out.textContent = t(locale, "ui.coverage.failed", { error: err.message });
   });
 });
 
@@ -207,21 +270,21 @@ byId("trendsBtn").addEventListener("click", () => {
   const dir = (byId("vizDir") as HTMLInputElement).value.trim();
   const out = byId("vizResult") as HTMLPreElement;
   if (!dir) {
-    out.textContent = "请输入工程目录";
+    out.textContent = t(locale, "ui.error.needDir");
     return;
   }
-  void api.trends(dir).then((r) => {
+  void api.trends(dir, locale).then((r) => {
     if (r.rows.length === 0) {
-      out.textContent = "近 14 天无回归记录";
+      out.textContent = t(locale, "ui.trends.empty");
       return;
     }
     const lines = r.rows.map((row) => {
       const bar = "▓".repeat(Math.min(row.passed + row.failed, 40));
-      return `  ${row.day}  通过 ${row.passed} · 失败 ${row.failed}  ${bar}`;
+      return t(locale, "ui.trends.row", { day: row.day, passed: row.passed, failed: row.failed, bar });
     });
-    out.textContent = ["回归趋势（近 14 天）:", ...lines].join("\n");
+    out.textContent = [t(locale, "ui.trends.title"), ...lines].join("\n");
   }).catch((err: Error) => {
-    out.textContent = `趋势查询失败: ${err.message}`;
+    out.textContent = t(locale, "ui.trends.failed", { error: err.message });
   });
 });
 
@@ -230,14 +293,17 @@ byId("fuzzBtn").addEventListener("click", () => {
   const seedRaw = (byId("dynArg") as HTMLInputElement).value.trim();
   const out = byId("dynResult") as HTMLPreElement;
   if (!dir) {
-    out.textContent = "请输入工程目录";
+    out.textContent = t(locale, "ui.error.needDir");
     return;
   }
-  out.textContent = "fuzz 中（真实引擎，耐心）…";
-  void api.fuzz(dir, { seed: seedRaw ? Number(seedRaw) : undefined }).then((r) => {
-    out.textContent = [`步数 ${r.steps} · 新颖状态 ${r.novelStates} · 崩溃 ${r.crashes.length}`, ...r.crashes.map((c) => `  崩溃: ${c}`)].join("\n");
+  out.textContent = t(locale, "ui.fuzz.running");
+  void api.fuzz(dir, { seed: seedRaw ? Number(seedRaw) : undefined }, locale).then((r) => {
+    out.textContent = [
+      t(locale, "ui.fuzz.summary", { steps: r.steps, novelStates: r.novelStates, crashes: r.crashes.length }),
+      ...r.crashes.map((c) => t(locale, "ui.fuzz.crash", { crash: c })),
+    ].join("\n");
   }).catch((err: Error) => {
-    out.textContent = `fuzz 失败: ${err.message}`;
+    out.textContent = t(locale, "ui.fuzz.failed", { error: err.message });
   });
 });
 
@@ -246,14 +312,14 @@ byId("goldenApproveBtn").addEventListener("click", () => {
   const tag = (byId("dynArg") as HTMLInputElement).value.trim() || "default";
   const out = byId("dynResult") as HTMLPreElement;
   if (!dir) {
-    out.textContent = "请输入工程目录";
+    out.textContent = t(locale, "ui.error.needDir");
     return;
   }
-  out.textContent = "截图中…";
-  void api.goldenApprove(dir, tag).then(() => {
-    out.textContent = `基线 ${tag} 已批准`;
+  out.textContent = t(locale, "ui.golden.approving");
+  void api.goldenApprove(dir, tag, locale).then(() => {
+    out.textContent = t(locale, "ui.golden.approved", { tag });
   }).catch((err: Error) => {
-    out.textContent = `golden 失败: ${err.message}`;
+    out.textContent = t(locale, "ui.golden.failed", { error: err.message });
   });
 });
 
@@ -262,14 +328,15 @@ byId("goldenCheckBtn").addEventListener("click", () => {
   const tag = (byId("dynArg") as HTMLInputElement).value.trim() || "default";
   const out = byId("dynResult") as HTMLPreElement;
   if (!dir) {
-    out.textContent = "请输入工程目录";
+    out.textContent = t(locale, "ui.error.needDir");
     return;
   }
-  out.textContent = "对比中…";
-  void api.goldenCheck(dir, tag).then((r) => {
-    out.textContent = `基线 ${r.tag} diffRatio=${r.diffRatio.toFixed(4)}${r.comparable ? "" : "（尺寸不匹配）"}`;
+  out.textContent = t(locale, "ui.golden.checking");
+  void api.goldenCheck(dir, tag, locale).then((r) => {
+    out.textContent = t(locale, "ui.golden.check", { tag: r.tag, ratio: r.diffRatio.toFixed(4) }) +
+      (r.comparable ? "" : t(locale, "ui.golden.sizeMismatch"));
   }).catch((err: Error) => {
-    out.textContent = `golden 失败: ${err.message}`;
+    out.textContent = t(locale, "ui.golden.failed", { error: err.message });
   });
 });
 
@@ -277,21 +344,21 @@ byId("recordStartBtn").addEventListener("click", () => {
   const dir = (byId("dynDir") as HTMLInputElement).value.trim();
   const out = byId("dynResult") as HTMLPreElement;
   if (!dir) {
-    out.textContent = "请输入工程目录";
+    out.textContent = t(locale, "ui.error.needDir");
     return;
   }
-  void api.recordStart(dir).then((r) => {
-    out.textContent = r.error ?? "录制中：在游戏窗口里游玩，完成后点\"停止并保存\"（或按 Esc）";
+  void api.recordStart(dir, locale).then((r) => {
+    out.textContent = r.error ?? t(locale, "ui.record.running");
   }).catch((err: Error) => {
-    out.textContent = `录制启动失败: ${err.message}`;
+    out.textContent = t(locale, "ui.record.startFailed", { error: err.message });
   });
 });
 
 byId("recordStopBtn").addEventListener("click", () => {
   const out = byId("dynResult") as HTMLPreElement;
-  void api.recordStop().then((r) => {
-    out.textContent = r.error ?? `已保存: ${r.path}（${r.steps} 步）`;
+  void api.recordStop(locale).then((r) => {
+    out.textContent = r.error ?? t(locale, "ui.record.saved", { path: r.path!, steps: r.steps! });
   }).catch((err: Error) => {
-    out.textContent = `录制停止失败: ${err.message}`;
+    out.textContent = t(locale, "ui.record.stopFailed", { error: err.message });
   });
 });

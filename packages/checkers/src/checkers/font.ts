@@ -4,8 +4,9 @@
  * 真值需要字体内容解析，故中置信。
  */
 import { Cmd, type CheckerPlugin, type GameUniverse, type IRDocument, type ReportSection } from "@rmtest/core";
+import { core } from "../i18n/core.ts";
 
-const CJK = /[\u2e80-\u9fff\uf900-\ufaff\uff00-\uffef]/;
+const CJK = /[\u2e80-\u9fff\uac00-\ud7a3\uf900-\ufaff\uff00-\uffef]/;
 /** MV 默认字体（无 CJK 覆盖） */
 const DEFAULT_FONTS = new Set(["mplus-1m-regular.ttf", "gamefont.css"]);
 
@@ -46,7 +47,7 @@ export const fontChecker: CheckerPlugin = {
           severity: "warning",
           confidence: "medium",
           location: { dataKey: "system" },
-          message: "游戏含中文/日文/韩文文本，但 fonts/ 只有 MV 默认字体（无 CJK 覆盖）——移动端/网页部署会显示方框缺字",
+          ...core("checker.core.missingCjkFont"),
           evidence: { fonts },
         },
       ];

@@ -3,6 +3,8 @@
  * 格式依据：godot-docs engine_details/file_formats/tscn.rst。
  */
 import type { CheckerPlugin, IRGodotNode, IRGodotSection, ReportSection } from "@rmtest/core";
+import type { LocalizableMessage } from "@rmtest/i18n";
+import { godot } from "../i18n/godot.ts";
 
 type GSection = IRGodotSection;
 
@@ -12,10 +14,18 @@ function sec(
   type: string,
   severity: ReportSection["severity"],
   confidence: ReportSection["confidence"],
-  message: string,
+  message: LocalizableMessage,
   evidence?: unknown,
 ): ReportSection {
-  return { type, severity, confidence, message, evidence };
+  return {
+    type,
+    severity,
+    confidence,
+    message: message.message,
+    messageId: message.messageId,
+    messageParams: message.messageParams,
+    evidence,
+  };
 }
 
 /** ref → 工程相对路径；null = 无法解析（缺 path 且缺 uid） */
@@ -35,39 +45,68 @@ export const godotMissingResourceChecker: CheckerPlugin = {
     const fileSet = new Set(t.files);
     const filesLower = new Set(t.files.map((f) => f.toLowerCase()));
 
-    const check = (where: string, ref: { path: string | null; uid: string | null }, label: string) => {
+    const check = (where: LocalizableMessage, ref: { path: string | null; uid: string | null }, label: LocalizableMessage) => {
       if (ref.path === null && ref.uid === null) return; // 内联/空引用
       const p = refPath(ref, t.uidToPath);
       if (p === null) {
-        out.push(sec("godot-missing-resource", "error", "high", `${where}：${label} uid ${ref.uid} 无法解析到文件`));
+        out.push(
+          sec(
+            "godot-missing-resource",
+            "error",
+            "high",
+            godot("checker.godot.refUnresolved", { where, label, uid: ref.uid ?? "" }),
+          ),
+        );
         return;
       }
       if (fileSet.has(p)) return;
       if (filesLower.has(p.toLowerCase())) {
-        out.push(sec("godot-missing-resource", "warning", "low", `${where}：${label} ${p} 存在但大小写不一致`));
+        out.push(
+          sec("godot-missing-resource", "warning", "low", godot("checker.godot.refCaseMismatch", { where, label, path: p })),
+        );
       } else {
-        out.push(sec("godot-missing-resource", "error", "high", `${where}：${label} ${p} 缺失`));
+        out.push(sec("godot-missing-resource", "error", "high", godot("checker.godot.refMissing", { where, label, path: p })));
       }
     };
 
     for (const s of t.scenes) {
-      for (const ref of s.extResources) check(`场景 ${s.path}`, ref, `ext_resource ${ref.type}`);
+      for (const ref of s.extResources) {
+        check(
+          godot("checker.godot.locationScene", { scene: s.path }),
+          ref,
+          godot("checker.godot.labelExtResource", { type: ref.type }),
+        );
+      }
       for (const n of s.nodes) {
-        if (n.scriptRef) check(`场景 ${s.path} · 节点 ${n.path}`, n.scriptRef, "脚本");
+        if (n.scriptRef) {
+          check(
+            godot("checker.godot.locationSceneNode", { scene: s.path, node: n.path }),
+            n.scriptRef,
+            godot("checker.godot.labelScript"),
+          );
+        }
       }
     }
     for (const r of t.resources) {
-      for (const ref of r.extResources) check(`资源 ${r.path}`, ref, `ext_resource ${ref.type}`);
+      for (const ref of r.extResources) {
+        check(
+          godot("checker.godot.locationResource", { resource: r.path }),
+          ref,
+          godot("checker.godot.labelExtResource", { type: ref.type }),
+        );
+      }
     }
 
     if (t.mainScene !== null) {
       if (!fileSet.has(t.mainScene)) {
-        out.push(sec("godot-missing-resource", "error", "high", `主场景 ${t.mainScene} 缺失`));
+        out.push(sec("godot-missing-resource", "error", "high", godot("checker.godot.mainSceneMissing", { scene: t.mainScene })));
       }
     }
     for (const a of t.autoloads) {
       if (!fileSet.has(a.path)) {
-        out.push(sec("godot-missing-resource", "error", "high", `autoload ${a.name} 的脚本 ${a.path} 缺失`));
+        out.push(
+          sec("godot-missing-resource", "error", "high", godot("checker.godot.autoloadScriptMissing", { name: a.name, path: a.path })),
+        );
       }
     }
     return out;
@@ -98,7 +137,7 @@ export const godotSceneCycleChecker: CheckerPlugin = {
     const stack: string[] = [];
     const reportCycle = (startIdx: number) => {
       const cycle = [...stack.slice(startIdx), stack[startIdx]!].join(" → ");
-      out.push(sec("godot-scene-cycle", "error", "high", `场景实例环：${cycle}，加载时无限递归`));
+      out.push(sec("godot-scene-cycle", "error", "high", godot("checker.godot.sceneCycle", { cycle })));
     };
 
     const visit = (p: string): void => {
@@ -146,7 +185,13 @@ export const godotConnectionMethodChecker: CheckerPlugin = {
               "godot-connection-method",
               "warning",
               "low",
-              `场景 ${s.path}：信号 ${c.signal} 连接到 ${c.to} 的处理函数 ${c.method}() 未在脚本 ${scriptPath} 中找到（可能由父类或内建虚方法提供）`,
+              godot("checker.godot.connectionMethodMissing", {
+                scene: s.path,
+                signal: c.signal,
+                to: c.to,
+                method: c.method,
+                script: scriptPath,
+              }),
             ),
           );
         }
@@ -164,13 +209,20 @@ export const godotBrokenProjectConfigChecker: CheckerPlugin = {
     if (!t) return NO_SECTIONS;
     const out: ReportSection[] = [];
     if (t.mainScene === null) {
-      out.push(sec("godot-project-config", "error", "high", "project.godot 未设置主场景（run/main_scene），游戏无法启动"));
+      out.push(sec("godot-project-config", "error", "high", godot("checker.godot.mainSceneNotSet")));
     } else if (!t.files.includes(t.mainScene) && !t.files.some((f) => f.toLowerCase() === t.mainScene!.toLowerCase())) {
-      out.push(sec("godot-project-config", "error", "high", `主场景 ${t.mainScene} 在工程中不存在`));
+      out.push(sec("godot-project-config", "error", "high", godot("checker.godot.mainSceneNotInProject", { scene: t.mainScene })));
     }
     for (const a of t.autoloads) {
       if (!t.files.includes(a.path) && !t.files.some((f) => f.toLowerCase() === a.path.toLowerCase())) {
-        out.push(sec("godot-project-config", "error", "high", `autoload ${a.name} 脚本 ${a.path} 缺失，游戏启动即报错`));
+        out.push(
+          sec(
+            "godot-project-config",
+            "error",
+            "high",
+            godot("checker.godot.autoloadScriptNotInProject", { name: a.name, path: a.path }),
+          ),
+        );
       }
     }
     return out;
@@ -204,7 +256,6 @@ export const godotNodePathChecker: CheckerPlugin = {
       for (const { scene, nodePath } of points) {
         const sceneData = t.scenes.find((s) => s.path === scene);
         if (!sceneData) continue;
-        const nodeMap = new Map(sceneData.nodes.map((n) => [n.path, n]));
         const children = new Map<string, IRGodotNode[]>();
         for (const n of sceneData.nodes) {
           const parent = n.path.includes("/") ? n.path.slice(0, n.path.lastIndexOf("/")) : ".";
@@ -216,37 +267,9 @@ export const godotNodePathChecker: CheckerPlugin = {
           (children.get(parent) ?? []).find((n) => n.name === name) ?? null;
 
         for (const raw of literalPaths) {
-          const isAncestorLookup = raw.startsWith("^");
-          const pathStr = isAncestorLookup ? raw.slice(1) : raw;
+          // ^"X" 只是 NodePath() 构造简写，等价于 "X"（相对当前节点），不是祖先查找
+          const pathStr = raw.startsWith("^") ? raw.slice(1) : raw;
           if (pathStr.length === 0 || pathStr === ".") continue;
-
-          if (isAncestorLookup) {
-            // ^"Name"：最近的名为 Name 的祖先
-            let cur = nodePath;
-            let found = false;
-            while (true) {
-              const parent = cur.includes("/") ? cur.slice(0, cur.lastIndexOf("/")) : null;
-              if (parent === null) break;
-              const pnode = nodeMap.get(parent);
-              if (!pnode) break;
-              if (pnode.name === pathStr) {
-                found = true;
-                break;
-              }
-              cur = parent;
-            }
-            if (!found) {
-              out.push(
-                sec(
-                  "godot-node-path",
-                  "warning",
-                  "low",
-                  `场景 ${scene} 节点 ${nodePath} 的脚本 ${scriptPath}：get_node(^"${pathStr}") 找不到对应祖先`,
-                ),
-              );
-            }
-            continue;
-          }
 
           // 相对路径逐段解析
           const segs = pathStr.split("/").filter((s) => s.length > 0);
@@ -280,7 +303,12 @@ export const godotNodePathChecker: CheckerPlugin = {
                 "godot-node-path",
                 "warning",
                 "low",
-                `场景 ${scene} 节点 ${nodePath} 的脚本 ${scriptPath}：get_node("${pathStr}") 解析不到节点（改名/移动后残留？）`,
+                godot("checker.godot.nodePathUnresolved", {
+                  scene,
+                  node: nodePath,
+                  script: scriptPath,
+                  path: pathStr,
+                }),
               ),
             );
           }

@@ -9,6 +9,7 @@
  */
 import { Cmd, type CheckerPlugin, type IRDocument, type Lifecycle, type RefLocation, type ReportSection } from "@rmtest/core";
 import { walkCommands } from "@rmtest/core";
+import { core } from "../i18n/core.ts";
 
 interface PageWrites {
   /** 页内写入点（commandIndex 升序） */
@@ -48,6 +49,8 @@ export const firstRunFalseChecker: CheckerPlugin = {
             if (type !== 0 && type !== 1) return;
             const kind = type === 0 ? "switch" : "variable";
             const id = Number(cmd.parameters[1]);
+            // 页面本身由同一开关门控时，页面运行即意味着该开关为 ON，恒假结论不成立
+            if (kind === "switch" && (page.conditions.switch1Id === id || page.conditions.switch2Id === id)) return;
             const writes = collectPageWrites(life, map.id, ev.id, page.index, kind, id);
 
             if (writes.indexes.length === 0) return; // 完全未写 → read-never-written 负责
@@ -59,7 +62,10 @@ export const firstRunFalseChecker: CheckerPlugin = {
                 severity: "warning",
                 confidence: "medium",
                 location: loc,
-                message: `首次触发时条件恒假：${kind === "switch" ? "开关" : "变量"} ${id} 的全部写入点位于本判断之后——事件需二次触发才可能进入此分支`,
+                ...core("checker.core.firstRunFalse", {
+                  kind: kind === "switch" ? core("checker.core.kind.switch") : core("checker.core.kind.variable"),
+                  id,
+                }),
                 evidence: { kind, id, writesAfter: writes.indexes },
               });
             }

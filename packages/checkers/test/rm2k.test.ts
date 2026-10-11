@@ -111,6 +111,71 @@ describe("RM2k/2k3 检查器", () => {
     }
   });
 
+  it("同父多子地图 → 不误报父链不连通", () => {
+    const dir = path.join(os.tmpdir(), `rmtest-rm2k-${process.pid}-${Math.random().toString(36).slice(2)}`);
+    mkdirSync(dir, { recursive: true });
+    // 地图 2/3 同为地图 1 的子节点：旧实现用全局 visited，后一张地图上溯到已访问的父节点即中断并误报
+    const lmt = new Enc()
+      .int(3)
+      .int(1).raw(body(new Enc().strField(0x01, "父").intField(0x02, 0).intField(0x04, 1))).int(0)
+      .int(2).raw(body(new Enc().strField(0x01, "子A").intField(0x02, 1).intField(0x04, 1))).int(0)
+      .int(3).raw(body(new Enc().strField(0x01, "子B").intField(0x02, 1).intField(0x04, 1))).int(0)
+      .int(2).int(1).int(2)
+      .int(0)
+      .raw(body(new Enc().intField(0x01, 1).intField(0x02, 1).intField(0x03, 1)));
+    writeFileSync(path.join(dir, "RPG_RT.lmt"), withHeader("LcfMapTree", lmt));
+
+    const db = new Enc()
+      .structVecField(0x17, [{ id: 1, body: body(new Enc().strField(0x01, "S1")) }])
+      .structVecField(0x18, [{ id: 1, body: body(new Enc().strField(0x01, "V1")) }])
+      .intField(0x1a, 2);
+    writeFileSync(path.join(dir, "RPG_RT.ldb"), withHeader("LcfDataBase", db));
+
+    for (const id of [1, 2, 3]) {
+      const map = new Enc().intField(0x01, 1).intField(0x02, 5).intField(0x03, 5);
+      writeFileSync(path.join(dir, `Map${String(id).padStart(4, "0")}.lmu`), withHeader("LcfMapUnit", map));
+    }
+
+    try {
+      const tree = run(dir).sections.filter((s) => s.type === "rm2k-map-tree");
+      expect(tree.filter((s) => s.message.includes("父链不连通"))).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("父节点未登记（悬空）→ 报父链不连通", () => {
+    const dir = path.join(os.tmpdir(), `rmtest-rm2k-${process.pid}-${Math.random().toString(36).slice(2)}`);
+    mkdirSync(dir, { recursive: true });
+    // 地图 2 的 parent=7，但树中没有 id=7 的节点 → 父链断裂，编辑器树中将不可见
+    const lmt = new Enc()
+      .int(2)
+      .int(1).raw(body(new Enc().strField(0x01, "根").intField(0x02, 0).intField(0x04, 1))).int(0)
+      .int(2).raw(body(new Enc().strField(0x01, "孤").intField(0x02, 7).intField(0x04, 1))).int(0)
+      .int(2).int(1).int(2)
+      .int(0)
+      .raw(body(new Enc().intField(0x01, 1).intField(0x02, 1).intField(0x03, 1)));
+    writeFileSync(path.join(dir, "RPG_RT.lmt"), withHeader("LcfMapTree", lmt));
+
+    const db = new Enc()
+      .structVecField(0x17, [{ id: 1, body: body(new Enc().strField(0x01, "S1")) }])
+      .structVecField(0x18, [{ id: 1, body: body(new Enc().strField(0x01, "V1")) }])
+      .intField(0x1a, 2);
+    writeFileSync(path.join(dir, "RPG_RT.ldb"), withHeader("LcfDataBase", db));
+
+    for (const id of [1, 2]) {
+      const map = new Enc().intField(0x01, 1).intField(0x02, 5).intField(0x03, 5);
+      writeFileSync(path.join(dir, `Map${String(id).padStart(4, "0")}.lmu`), withHeader("LcfMapUnit", map));
+    }
+
+    try {
+      const tree = run(dir).sections.filter((s) => s.type === "rm2k-map-tree");
+      expect(tree.filter((s) => s.message.includes("地图 2") && s.message.includes("父链不连通"))).toHaveLength(1);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("合法工程 → 零 RM2k 报告", () => {
     const dir = path.join(os.tmpdir(), `rmtest-rm2k-${process.pid}-${Math.random().toString(36).slice(2)}`);
     // 干净版：Map0002 单独构造（无 bug 命令）

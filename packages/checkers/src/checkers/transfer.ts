@@ -5,8 +5,10 @@
  * 2. 目标格子四向全阻挡 → 卡死在墙里
  * 3. 目标格子可站但四周均不可走 → 无法离开
  */
-import { Cmd, type CheckerPlugin, type IRDocument, type IRMap, type IRTileset, type ReportSection } from "@rmtest/core";
+import { Cmd, type CheckerPlugin, type CommandLocation, type IRCommand, type IRDocument, type IRMap, type IRTileset, type ReportSection } from "@rmtest/core";
 import { walkCommands } from "@rmtest/core";
+import type { LocalizableMessage } from "@rmtest/i18n";
+import { core } from "../i18n/core.ts";
 
 const BLOCKED = 0xf;
 
@@ -28,7 +30,7 @@ function checkTarget(
   x: number,
   y: number,
   location: ReportSection["location"],
-  what: string,
+  what: LocalizableMessage,
   sections: ReportSection[],
 ): void {
   const map = ir.maps.find((m) => m.id === mapId);
@@ -40,7 +42,7 @@ function checkTarget(
       severity: "error",
       confidence: "high",
       location,
-      message: `${what}目标 (${x}, ${y}) 在地图 ${mapId}（${map.width}×${map.height}）外 —— 传送越界`,
+      ...core("checker.core.transferOutOfBounds", { what, x, y, mapId, width: map.width, height: map.height }),
       evidence: { mapId, x, y, width: map.width, height: map.height },
     });
     return;
@@ -58,7 +60,7 @@ function checkTarget(
       severity: "error",
       confidence: "high",
       location,
-      message: `${what}目标 (${x}, ${y}) 是不可走格子（四向全阻挡）—— 角色卡死在墙里`,
+      ...core("checker.core.transferBlockedTile", { what, x, y }),
       evidence: { mapId, x, y, tileId },
     });
     return;
@@ -86,7 +88,7 @@ function checkTarget(
       severity: "warning",
       confidence: "medium",
       location,
-      message: `${what}点 (${x}, ${y}) 四周均不可走或出界 —— 角色无法离开（软锁候选）`,
+      ...core("checker.core.transferNoEscape", { what, x, y }),
       evidence: { mapId, x, y },
     });
   }
@@ -99,26 +101,28 @@ export const transferSoftlockChecker: CheckerPlugin = {
 
     // 开局点
     const sys = ir.system;
-    checkTarget(ir, sys.startMapId, sys.startX, sys.startY, { dataKey: "system" }, "开局", sections);
+    checkTarget(ir, sys.startMapId, sys.startX, sys.startY, { dataKey: "system" }, core("checker.core.what.start"), sections);
 
-    // 全部传送命令
+    // 全部传送命令（地图事件 + 公共事件）
+    const scanTransfers = (commands: IRCommand[], loc: CommandLocation) => {
+      walkCommands(commands, loc, (cmd, cmdLoc) => {
+        if (cmd.code !== Cmd.TransferPlayer) return;
+        // 真实格式: [mode, mapId, x, y, dir, fade]；变量指定（mode≠0）静态无法判定，跳过
+        if (Number(cmd.parameters[0]) !== 0) return;
+        const mapId = Number(cmd.parameters[1]);
+        const x = Number(cmd.parameters[2]);
+        const y = Number(cmd.parameters[3]);
+        if (!Number.isFinite(mapId) || !Number.isFinite(x) || !Number.isFinite(y)) return;
+        checkTarget(ir, mapId, x, y, cmdLoc, core("checker.core.what.transfer"), sections);
+      });
+    };
+
     for (const map of ir.maps) {
       for (const ev of map.events) {
-        for (const page of ev.pages) {
-          const loc = { mapId: map.id, eventId: ev.id, pageIndex: page.index };
-          walkCommands(page.commands, loc, (cmd, cmdLoc) => {
-            if (cmd.code !== Cmd.TransferPlayer) return;
-            // 真实格式: [mode, mapId, x, y, dir, fade]；变量指定（mode≠0）静态无法判定，跳过
-            if (Number(cmd.parameters[0]) !== 0) return;
-            const mapId = Number(cmd.parameters[1]);
-            const x = Number(cmd.parameters[2]);
-            const y = Number(cmd.parameters[3]);
-            if (!Number.isFinite(mapId) || !Number.isFinite(x) || !Number.isFinite(y)) return;
-            checkTarget(ir, mapId, x, y, cmdLoc, "传送", sections);
-          });
-        }
+        for (const page of ev.pages) scanTransfers(page.commands, { mapId: map.id, eventId: ev.id, pageIndex: page.index });
       }
     }
+    for (const ce of ir.commonEvents) scanTransfers(ce.commands, { dataKey: "commonEvent", dataId: ce.id });
     return sections;
   },
 };

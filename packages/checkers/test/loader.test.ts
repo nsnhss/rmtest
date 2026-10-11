@@ -42,4 +42,33 @@ describe("插件加载器", () => {
     expect(checkers).toEqual([]);
     expect(errors[0]!.message).toContain("目录不可读");
   });
+
+  it("irVersion 超出支持范围 → 加载期闸门拒绝（不再靠内核兜底）", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "rmtest-plugins-version-"));
+    writeFileSync(
+      path.join(dir, "future.ts"),
+      VALID_CHECKER.replace("irVersion: 1", "irVersion: 99"),
+    );
+    try {
+      const { checkers, errors } = await loadCheckersFromDir(dir);
+      expect(checkers).toEqual([]);
+      expect(errors).toHaveLength(1);
+      expect(errors[0]!.message).toContain("兼容闸门");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it(".d.ts 声明文件被跳过（不是模块，import 会炸）", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "rmtest-plugins-dts-"));
+    writeFileSync(path.join(dir, "sample-checker.d.ts"), "export declare const x: number;");
+    writeFileSync(path.join(dir, "good.ts"), VALID_CHECKER);
+    try {
+      const { checkers, errors } = await loadCheckersFromDir(dir);
+      expect(checkers).toHaveLength(1);
+      expect(errors).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });

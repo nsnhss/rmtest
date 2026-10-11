@@ -11,9 +11,18 @@ import { scenarioMapCoverage } from "@rmtest/core";
 import { ScenarioSchema } from "@rmtest/dsl";
 import { REAL_BRIDGE, gotoMap, startRecording, type GameHandle, type RecordingHandle } from "@rmtest/runtime";
 import { ProjectStore } from "@rmtest/store";
+import { getLocale, resolveLocale, setLocale, t, type Locale } from "@rmtest/i18n";
 
-ipcMain.handle("scan", (_e, dir: string) => {
-  const summary = scan(dir);
+/** 切换主进程当前语言；未带 locale 时沿用现有（供深层模块取用） */
+function useLocale(locale?: string | null): Locale {
+  const resolved = locale ? resolveLocale(locale) : getLocale();
+  setLocale(resolved);
+  return resolved;
+}
+
+ipcMain.handle("scan", (_e, dir: string, locale?: string) => {
+  const loc = useLocale(locale);
+  const summary = scan(dir, { locale: loc });
   const reportPath = path.join(dir, "rmtest-report.html");
   writeFileSync(reportPath, summary.html);
   return {
@@ -24,18 +33,23 @@ ipcMain.handle("scan", (_e, dir: string) => {
   };
 });
 
-ipcMain.handle("maintain", (_e, dir: string, corpusPath: string, apply: boolean) => {
+ipcMain.handle("maintain", (_e, dir: string, corpusPath: string, apply: boolean, locale?: string) => {
+  const loc = useLocale(locale);
   let raw: unknown;
   try {
     raw = JSON.parse(readFileSync(corpusPath, "utf8"));
   } catch (err) {
-    return { error: `语料文件读取失败: ${err instanceof Error ? err.message : String(err)}` };
+    return { error: t(loc, "ui.error.corpusRead", { error: err instanceof Error ? err.message : String(err) }) };
   }
-  if (!Array.isArray(raw)) return { error: "语料文件必须是场景数组" };
+  if (!Array.isArray(raw)) return { error: t(loc, "ui.error.corpusNotArray") };
   const outcome = maintain(dir, raw);
   const details = outcome.report.items
     .filter((i) => i.status !== "fresh")
-    .map((i) => `[${i.status}] ${i.scenarioId}${i.issues.length > 0 ? ` — ${i.issues.join("; ")}` : ""}`);
+    .map((i) =>
+      i.issues.length > 0
+        ? t(loc, "ui.maintain.itemWithIssues", { status: i.status, id: i.scenarioId, issues: i.issues.join("; ") })
+        : t(loc, "ui.maintain.item", { status: i.status, id: i.scenarioId }),
+    );
   if (apply) writeFileSync(corpusPath, JSON.stringify(outcome.corpus, null, 2));
   return {
     report: outcome.report,
@@ -47,7 +61,8 @@ ipcMain.handle("maintain", (_e, dir: string, corpusPath: string, apply: boolean)
   };
 });
 
-ipcMain.handle("content", (_e, dir: string, baselinePath: string | null) => {
+ipcMain.handle("content", (_e, dir: string, baselinePath: string | null, locale?: string) => {
+  useLocale(locale);
   let baselineKeys: string[] | undefined;
   if (baselinePath) {
     try {
@@ -60,7 +75,8 @@ ipcMain.handle("content", (_e, dir: string, baselinePath: string | null) => {
   return contentReport(dir, baselineKeys);
 });
 
-ipcMain.handle("aigen", async (_e, dir: string, nl: string) => {
+ipcMain.handle("aigen", async (_e, dir: string, nl: string, locale?: string) => {
+  useLocale(locale);
   const outcome = await aigen(dir, nl, defaultProvider());
   return {
     scenarioJson: outcome.scenarioJson,
@@ -70,29 +86,35 @@ ipcMain.handle("aigen", async (_e, dir: string, nl: string) => {
   };
 });
 
-ipcMain.handle("corpus-list", (_e, dir: string) => {
+ipcMain.handle("corpus-list", (_e, dir: string, locale?: string) => {
+  useLocale(locale);
   const entries = corpusList(dir);
   return { entries, count: entries.length };
 });
 
-ipcMain.handle("corpus-add", (_e, dir: string, scenarioPath: string) => {
+ipcMain.handle("corpus-add", (_e, dir: string, scenarioPath: string, locale?: string) => {
+  useLocale(locale);
   const r = corpusAdd(dir, scenarioPath);
   return { id: r.id, steps: r.steps };
 });
 
-ipcMain.handle("regress", async (_e, dir: string) => {
+ipcMain.handle("regress", async (_e, dir: string, locale?: string) => {
+  const loc = useLocale(locale);
   const summary = await regressCli(dir);
   return {
     passed: summary.passed,
     failed: summary.failed,
     skipped: summary.skipped,
-    details: summary.items.map(
-      (i) => `[${i.outcome}] (${i.status}) ${i.scenarioId}${i.message ? ` — ${i.message}` : ""}`,
+    details: summary.items.map((i) =>
+      i.message
+        ? t(loc, "ui.regress.itemWithMessage", { outcome: i.outcome, status: i.status, id: i.scenarioId, message: i.message })
+        : t(loc, "ui.regress.item", { outcome: i.outcome, status: i.status, id: i.scenarioId }),
     ),
   };
 });
 
-ipcMain.handle("coverage", (_e, dir: string) => {
+ipcMain.handle("coverage", (_e, dir: string, locale?: string) => {
+  useLocale(locale);
   const { project } = loadProjectAny(dir);
   const store = new ProjectStore(path.join(dir, "rmtest.db"));
   const scenarios = store.listScenarios().map((s) => ScenarioSchema.parse(JSON.parse(s.json)));
@@ -100,24 +122,28 @@ ipcMain.handle("coverage", (_e, dir: string) => {
   return scenarioMapCoverage(project.ir, scenarios);
 });
 
-ipcMain.handle("trends", (_e, dir: string) => {
+ipcMain.handle("trends", (_e, dir: string, locale?: string) => {
+  useLocale(locale);
   const store = new ProjectStore(path.join(dir, "rmtest.db"));
   const rows = store.trendSummary(14);
   store.close();
   return { rows };
 });
 
-ipcMain.handle("fuzz", async (_e, dir: string, opts: { maxSteps?: number; timeBudgetMs?: number; seed?: number }) => {
+ipcMain.handle("fuzz", async (_e, dir: string, opts: { maxSteps?: number; safetyBudgetMs?: number; seed?: number }, locale?: string) => {
+  useLocale(locale);
   const result = await fuzzCli(dir, opts);
   return { steps: result.steps, novelStates: result.novelStates, crashes: result.crashes };
 });
 
-ipcMain.handle("golden-approve", async (_e, dir: string, tag: string) => {
+ipcMain.handle("golden-approve", async (_e, dir: string, tag: string, locale?: string) => {
+  useLocale(locale);
   await goldenCli(dir, tag, "approve");
   return { ok: true, tag };
 });
 
-ipcMain.handle("golden-check", async (_e, dir: string, tag: string) => {
+ipcMain.handle("golden-check", async (_e, dir: string, tag: string, locale?: string) => {
+  useLocale(locale);
   const r = await goldenCli(dir, tag, "check");
   return { tag: r.tag, diffRatio: r.diffRatio, comparable: r.comparable };
 });
@@ -125,8 +151,9 @@ ipcMain.handle("golden-check", async (_e, dir: string, tag: string) => {
 // —— 录制：可见游戏窗口，用户真实游玩，键盘捕获 → DSL 场景 ——
 let activeRecording: { handle: RecordingHandle; dir: string; win: BrowserWindow } | null = null;
 
-ipcMain.handle("record-start", async (_e, dir: string) => {
-  if (activeRecording) return { error: "已有录制会话在运行" };
+ipcMain.handle("record-start", async (_e, dir: string, locale?: string) => {
+  const loc = useLocale(locale);
+  if (activeRecording) return { error: t(loc, "ui.record.busy") };
   const url = pathToFileURL(path.join(dir, "index.html")).href;
   const win = new BrowserWindow({
     width: 816,
@@ -164,12 +191,12 @@ ipcMain.handle("record-start", async (_e, dir: string) => {
   }
   if (!ready) {
     win.close();
-    return { error: "游戏引擎启动超时" };
+    return { error: t(loc, "ui.record.engineTimeout") };
   }
   const entered = await gotoMap(adapter);
   if (!entered) {
     win.close();
-    return { error: "进入地图场景失败" };
+    return { error: t(loc, "ui.record.enterMapFailed") };
   }
 
   const handle = await startRecording(adapter, { scenarioId: `rec-${Date.now()}` });
@@ -177,8 +204,9 @@ ipcMain.handle("record-start", async (_e, dir: string) => {
   return { ok: true };
 });
 
-ipcMain.handle("record-stop", async () => {
-  if (!activeRecording) return { error: "无录制会话" };
+ipcMain.handle("record-stop", async (_e, locale?: string) => {
+  const loc = useLocale(locale);
+  if (!activeRecording) return { error: t(loc, "ui.record.noSession") };
   const { handle, dir, win } = activeRecording;
   activeRecording = null;
   const scenario = await handle.stop();

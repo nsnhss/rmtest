@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { build } from "esbuild";
 import { connect, type Browser, type Page } from "puppeteer-core";
 import { closeCdp, launchElectron } from "@rmtest/runtime";
+import { t } from "@rmtest/i18n";
 
 const APP_DIR = path.resolve(import.meta.dirname, "..");
 const FIXTURE_DATA = new URL("../../../packages/adapters/mv/fixtures/mini/data/", import.meta.url);
@@ -14,6 +15,15 @@ async function click(page: Page, selector: string): Promise<void> {
   await page.evaluate((sel) => {
     (document.querySelector(sel) as HTMLElement).click();
   }, selector);
+}
+
+/** 切换界面语言（触发 renderer 的 change 监听） */
+async function setLang(page: Page, lang: string): Promise<void> {
+  await page.evaluate((value) => {
+    const select = document.getElementById("langSelect") as HTMLSelectElement;
+    select.value = value;
+    select.dispatchEvent(new Event("change"));
+  }, lang);
 }
 
 let browser: Browser | undefined;
@@ -69,6 +79,9 @@ beforeAll(async () => {
     // 例外（ts-no-test-timers）：集成测试等待真实 Electron 窗口就绪，平台时钟不可被假时钟控制
     await new Promise((r) => setTimeout(r, 300));
   }
+  // renderer 就绪（语言选项由 LOCALE_LABELS 填充）后固定为中文，抵消上次运行遗留的 localStorage
+  await page.waitForFunction(() => document.getElementById("langSelect")?.children.length === 4, { timeout: 20_000 });
+  await setLang(page, "zh");
 }, 120_000);
 
 afterAll(async () => {
@@ -86,6 +99,7 @@ afterAll(async () => {
 
 describe("桌面 UI 冒烟", () => {
   it("输入路径 → 点击扫描 → 统计与报告 iframe 出现", { timeout: 120_000 }, async () => {
+    await setLang(page, "zh");
     await page.evaluate((dir) => {
       (document.getElementById("scanDir") as HTMLInputElement).value = dir;
     }, projectDir!);
@@ -104,6 +118,7 @@ describe("桌面 UI 冒烟", () => {
   });
 
   it("新内容检测按钮 → 报出可达事件页", { timeout: 120_000 }, async () => {
+    await setLang(page, "zh");
     await page.evaluate((dir) => {
       (document.getElementById("contentDir") as HTMLInputElement).value = dir;
     }, projectDir!);
@@ -116,6 +131,7 @@ describe("桌面 UI 冒烟", () => {
   });
 
   it("场景库列表按钮 → 空语料报告", { timeout: 120_000 }, async () => {
+    await setLang(page, "zh");
     await page.evaluate((dir) => {
       (document.getElementById("corpusDir") as HTMLInputElement).value = dir;
     }, projectDir!);
@@ -127,6 +143,7 @@ describe("桌面 UI 冒烟", () => {
   });
 
   it("覆盖地图按钮 → 报出可达地图覆盖", { timeout: 120_000 }, async () => {
+    await setLang(page, "zh");
     await page.evaluate((dir) => {
       (document.getElementById("vizDir") as HTMLInputElement).value = dir;
     }, projectDir!);
@@ -139,6 +156,7 @@ describe("桌面 UI 冒烟", () => {
   });
 
   it("回归趋势按钮 → 无记录提示", { timeout: 120_000 }, async () => {
+    await setLang(page, "zh");
     await page.evaluate((dir) => {
       (document.getElementById("vizDir") as HTMLInputElement).value = dir;
     }, projectDir!);
@@ -147,5 +165,41 @@ describe("桌面 UI 冒烟", () => {
 
     const text = await page.evaluate(() => document.getElementById("vizResult")!.textContent!);
     expect(text).toContain("近 14 天无回归记录");
+  });
+
+  it("切换语言 → 界面外壳与结果串跟随所选语言", { timeout: 120_000 }, async () => {
+    // English：外壳来自 LOCALE_LABELS 之外的目录 key
+    await setLang(page, "en");
+    expect(await page.evaluate(() => document.getElementById("scanBtn")!.textContent)).toBe(t("en", "ui.btn.scan"));
+    expect(await page.evaluate(() => document.querySelector("h1")!.textContent)).toBe(t("en", "ui.app.title"));
+    expect(await page.evaluate(() => (document.getElementById("scanDir") as HTMLInputElement).placeholder)).toBe(
+      t("en", "ui.placeholder.mvProject"),
+    );
+    expect(await page.evaluate(() => document.documentElement.lang)).toBe("en");
+
+    // 结果串也用新语言：复用 content 检测（2 个可达事件页、无基线）
+    await page.evaluate((dir) => {
+      (document.getElementById("contentDir") as HTMLInputElement).value = dir;
+    }, projectDir!);
+    await click(page, "#contentBtn");
+    const totalEn = t("en", "ui.content.total", { count: 2 });
+    await page.waitForFunction(
+      (expected) => (document.getElementById("contentResult")?.textContent ?? "").includes(expected),
+      { timeout: 90_000, polling: 100 },
+      totalEn,
+    );
+    const text = await page.evaluate(() => document.getElementById("contentResult")!.textContent!);
+    expect(text).toContain(totalEn);
+    expect(text).toContain(t("en", "ui.content.noBaseline"));
+
+    // 日本語 / 한국어 同样生效
+    await setLang(page, "ja");
+    expect(await page.evaluate(() => document.getElementById("scanBtn")!.textContent)).toBe(t("ja", "ui.btn.scan"));
+    await setLang(page, "ko");
+    expect(await page.evaluate(() => document.getElementById("scanBtn")!.textContent)).toBe(t("ko", "ui.btn.scan"));
+
+    // 复位中文（同时持久化，避免污染后续复用 profile 的运行）
+    await setLang(page, "zh");
+    expect(await page.evaluate(() => document.getElementById("scanBtn")!.textContent)).toBe(t("zh", "ui.btn.scan"));
   });
 });

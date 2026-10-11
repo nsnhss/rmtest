@@ -11,8 +11,20 @@ import { findProjectFile as findGbsProjectFile, loadProject as loadGbs, type Loa
 import { loadProject as loadGodot, type LoadedProject as GodotProject } from "@rmtest/adapter-godot";
 import { loadProject as loadRm2k, type LoadedProject as Rm2kProject } from "@rmtest/adapter-rm2k";
 
-export type EngineKind = "mv" | "rgss" | "tyrano" | "gbs" | "godot" | "rm2k";
+export type EngineKind = "mv" | "mz" | "rgss" | "tyrano" | "gbs" | "godot" | "rm2k";
 export type AnyLoadedProject = MvProject | RgssProject | TyranoProject | GbsProject | GodotProject | Rm2kProject;
+
+/** MV/MZ 编辑器工程常把游戏根放在 www/ 下；直接指向游戏根也支持 */
+function resolveGameRoot(dir: string): string {
+  if (existsSync(path.join(dir, "data"))) return dir;
+  const www = path.join(dir, "www");
+  return existsSync(path.join(www, "data")) ? www : dir;
+}
+
+/** MZ 运行时是 rmmz_*.js，MV 是 rpg_*.js（无运行时按 MV 处理） */
+function detectMvFlavor(root: string): "mv" | "mz" {
+  return existsSync(path.join(root, "js", "rmmz_core.js")) ? "mz" : "mv";
+}
 
 export function detectEngine(dir: string): EngineKind {
   const markers = [
@@ -36,11 +48,12 @@ export function detectEngine(dir: string): EngineKind {
   if (findGbsProjectFile(dir) !== null) return "gbs";
   // Godot：project.godot
   if (existsSync(path.join(dir, "project.godot"))) return "godot";
-  return "mv";
+  return detectMvFlavor(resolveGameRoot(dir));
 }
 
 export function loadProjectAny(dir: string): { engine: EngineKind; project: AnyLoadedProject } {
   const engine = detectEngine(dir);
+  const mvRoot = resolveGameRoot(dir);
   const project =
     engine === "rgss"
       ? loadRgss(dir)
@@ -52,6 +65,6 @@ export function loadProjectAny(dir: string): { engine: EngineKind; project: AnyL
             ? loadGodot(dir)
             : engine === "rm2k"
               ? loadRm2k(dir)
-              : loadMv(dir);
+              : loadMv(mvRoot, engine === "mz" ? "mz" : "mv");
   return { engine, project };
 }

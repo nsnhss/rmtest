@@ -7,7 +7,8 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@rmtest/core": "workspace:*"
+    "@rmtest/core": "workspace:*",
+    "@rmtest/i18n": "workspace:*"
   },
   "devDependencies": {
     "@rmtest/adapter-mv": "workspace:*",

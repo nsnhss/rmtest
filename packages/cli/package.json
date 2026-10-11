@@ -20,6 +20,7 @@
     "@rmtest/freshness": "workspace:*",
     "@rmtest/ai": "workspace:*",
     "@rmtest/runtime": "workspace:*",
-    "@rmtest/store": "workspace:*"
+    "@rmtest/store": "workspace:*",
+    "@rmtest/i18n": "workspace:*"
   }
 }

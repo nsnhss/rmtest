@@ -16,8 +16,11 @@ import type {
 function asRecord(v: unknown): Record<string, unknown> {
   return typeof v === "object" && v !== null ? (v as Record<string, unknown>) : {};
 }
+/** 资源列表归一化：旧版为数组，GB Studio 3+/4.x 以 id 为键的对象持久化资源，两者兼容 */
 function asArr(v: unknown): unknown[] {
-  return Array.isArray(v) ? (v as unknown[]) : [];
+  if (Array.isArray(v)) return v as unknown[];
+  if (typeof v === "object" && v !== null) return Object.values(v as Record<string, unknown>);
+  return [];
 }
 function str(v: unknown): string {
   return typeof v === "string" ? v : "";

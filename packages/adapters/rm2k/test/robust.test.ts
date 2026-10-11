@@ -3,6 +3,23 @@
  */
 import { describe, expect, it } from "vitest";
 import { parseLdb, parseLmt, parseLmu } from "../src/parse.ts";
+import { writeInt } from "../src/lcf.ts";
+import { Enc, withHeader } from "../src/enc.ts";
+
+const body = (e: Enc): number[] => Array.from(e.out);
+
+/**
+ * 构造恰好 16 字节的 LMU：header 字符串 + 0x51（事件向量）块，
+ * 向量计数被声明为 count（可达 0xFFFFFFFF）。header 内容仅占位
+ * （解析器不校验 header 文本），长度用来把总长对齐到 16 字节。
+ */
+function lmuWithHugeEventCount(count: number): Uint8Array {
+  const tag = "LcfMapUnit";
+  const countBytes = writeInt(count);
+  const headerLen = 16 - (1 + 1 + 1 + countBytes.length); // 长度字节 + 0x51 + 块长度字节 + 计数
+  const header = [...tag.slice(0, headerLen)].map((c) => c.charCodeAt(0));
+  return new Uint8Array([headerLen, ...header, 0x51, countBytes.length, ...countBytes]);
+}
 
 describe("LCF 损坏输入", () => {
   it("空文件与短文件", () => {
@@ -30,23 +47,35 @@ describe("LCF 损坏输入", () => {
     expect(r.maps).toEqual([]);
   });
 
-  it("事件命令截断（参数数大于可用字节）→ 不崩溃", () => {
-    // 头 + Map 块 + events 块：命令 code=10810 后参数计数 999 但文件截断
-    const chunks: number[] = [];
-    const map = [0x01, 0x01, 0x02, 0x02, 0x05, 0x03, 0x05]; // chipset/width/height
-    chunks.push(0x51);
-    const ev = [0x01, 0x01, 0x45, 0x02, 0x02, 0x01, 0x03, 0x03, 0x01];
-    const page = [0x21, 0x01, 0x00, 0x34];
-    // commands 载荷：code BER 10810、indent 0、string 0、参数计数 999 后只给 1 字节
-    const cmdPayload = [0xe7, 0x02, 0x6e, 0x00, 0x00, 0x87, 0x67, 0x00, 0x00, 0x00, 0x00, 0x42];
-    const lmu = new Uint8Array([
-      11, ..."LcfMapUnit".split("").map((c) => c.charCodeAt(0)),
-      ...map,
-      ...ev,
-      ...page,
-      ...cmdPayload,
+  it("事件命令截断（参数数远大于可用字节）→ 不崩溃且结果有界", () => {
+    // commands 载荷：code 10810、indent 0、string ""、声明参数 999，随后仅 1 字节即截断
+    const cmdPayload = [...writeInt(10810), ...writeInt(0), 0, ...writeInt(999), 0x42];
+    const page = new Enc().intField(0x21, 0).chunk(0x34, cmdPayload);
+    const ev = new Enc().strField(0x01, "EV1").structVecField(0x05, [{ id: 1, body: body(page) }]);
+    const map = new Enc().intField(0x01, 7).structVecField(0x51, [{ id: 5, body: body(ev) }]);
+    const lmu = withHeader("LcfMapUnit", map);
+
+    const parsed = parseLmu(lmu);
+    const commands = parsed.events.flatMap((e) => e.pages.flatMap((p) => p.commands));
+    expect(commands).toHaveLength(1); // 确认真的走到了命令解析
+    // 声明 999 个参数但载荷只剩 1 字节 → 参数数必须被钳制到输入规模内
+    expect(commands[0]!.parameters.length).toBeLessThanOrEqual(lmu.length);
+  });
+
+  it("超大事件计数（16 字节 LMU 声明 200000 / 4000000000）→ 不崩溃且结果有界", () => {
+    for (const count of [200000, 4000000000]) {
+      const bytes = lmuWithHugeEventCount(count);
+      expect(bytes).toHaveLength(16);
+      const result = parseLmu(bytes);
+      expect(result.events.length).toBeLessThanOrEqual(bytes.length);
+    }
+    // 顶层向量没有块长可用，走剩余字节预算：LMT 地图向量
+    const lmt = new Uint8Array([
+      ...writeInt(10),
+      ..."LcfMapTree".split("").map((c) => c.charCodeAt(0)),
+      ...writeInt(200000),
     ]);
-    expect(() => parseLmu(lmu)).not.toThrow();
+    expect(parseLmt(lmt).maps.length).toBeLessThanOrEqual(lmt.length);
   });
 
   it("乱码字节全量遍历不崩溃（512 字节伪随机）", () => {

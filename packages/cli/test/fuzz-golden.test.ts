@@ -18,7 +18,7 @@ describe.skipIf(!PROJECT)("CLI fuzz + golden（真实引擎）", () => {
   it("fuzz：探索产生新颖状态且无崩溃", { timeout: 180_000 }, async () => {
     const dir = copyProject(PROJECT!);
     try {
-      const result = await fuzzCli(dir, { maxSteps: 80, timeBudgetMs: 20_000, seed: 42 });
+      const result = await fuzzCli(dir, { maxSteps: 80, safetyBudgetMs: 20_000, seed: 42 });
       expect(result.crashes).toEqual([]);
       expect(result.steps).toBeGreaterThan(0);
       expect(result.novelStates).toBeGreaterThan(0);

@@ -5,14 +5,21 @@
  * 有变更列出受影响文件。基线存项目库 meta（prev_file_hashes）。
  */
 import path from "node:path";
+import type { Locale } from "@rmtest/i18n";
 import { checkers } from "@rmtest/checkers";
-import { buildLifecycle, buildRefGraph, runCheckers } from "@rmtest/core";
+import { buildLifecycle, buildRefGraph, runCheckers, type CheckerPlugin } from "@rmtest/core";
 import { renderReport } from "@rmtest/report";
 import { ProjectStore } from "@rmtest/store";
 import { loadProjectAny, type AnyLoadedProject } from "./loader.ts";
 
 export interface ScanOptions {
   incremental?: boolean;
+  /** 报告语言，默认中文 */
+  locale?: Locale;
+  /** 用户插件 checker（CLI --checkers <目录> 加载而来），与内置检查器合并执行 */
+  checkers?: readonly CheckerPlugin[];
+  /** 插件加载期错误（进入报告，触发"分析不完整"提示） */
+  pluginErrors?: { plugin: string; message: string }[];
 }
 
 export interface ScanSummary {
@@ -58,40 +65,43 @@ export function scan(projectDir: string, opts: ScanOptions = {}): ScanSummary {
         }
       }
       store.setMeta(PREV_HASHES_KEY, JSON.stringify(current));
-      const result = runFull(loaded);
+      const result = runFull(loaded, opts);
       return { ...result, changedFiles: prevJson === null ? null : changedFiles, unchanged: false };
     } finally {
       store.close();
     }
   }
 
-  return { ...runFull(loaded), changedFiles: null, unchanged: false };
+  return { ...runFull(loaded, opts), changedFiles: null, unchanged: false };
 }
 
-function runFull(loaded: AnyLoadedProject): Omit<ScanSummary, "changedFiles" | "unchanged"> {
+function runFull(loaded: AnyLoadedProject, opts: ScanOptions): Omit<ScanSummary, "changedFiles" | "unchanged"> {
   const facts = {
     refgraph: buildRefGraph(loaded.ir),
     lifecycle: buildLifecycle(loaded.ir),
     universe: loaded.universe,
     assets: loaded.assets,
   };
-  const result = runCheckers(checkers, facts, loaded.ir);
+  const result = runCheckers(opts.checkers ?? checkers, facts, loaded.ir);
 
   const counts = { error: 0, warning: 0, info: 0 };
   for (const s of result.sections) counts[s.severity]++;
+
+  const pluginErrors = [...(opts.pluginErrors ?? []), ...result.errors];
 
   const html = renderReport({
     ir: loaded.ir,
     sections: result.sections,
     fingerprint: loaded.fingerprint,
     loadWarnings: loaded.warnings,
-    pluginErrors: result.errors,
+    pluginErrors,
+    locale: opts.locale,
   });
 
   return {
     html,
     counts,
-    pluginErrors: result.errors,
+    pluginErrors,
     loadWarnings: loaded.warnings,
     fingerprint: loaded.fingerprint,
   };

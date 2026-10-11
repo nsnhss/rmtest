@@ -1,8 +1,9 @@
 /**
  * HTML 报告渲染 —— 类型化 section 的展示层。
- * 未知 section 类型优雅降级为通用行，不崩。
+ * 未知 section 类型优雅降级为通用行，不崩；文案走 @rmtest/i18n（中文 / 日本語 / 한국어 / English）。
  */
-import { formatLocation, type IRDocument, type ReportSection } from "@rmtest/core";
+import { BCP47, DEFAULT_LOCALE, localizeMessage, t, type Locale } from "@rmtest/i18n";
+import { formatLocation, type IRDocument, type LocationLabels, type ReportSection } from "@rmtest/core";
 
 export interface RenderInput {
   ir: IRDocument;
@@ -11,13 +12,11 @@ export interface RenderInput {
   loadWarnings: string[];
   pluginErrors: { plugin: string; message: string }[];
   generatedAt?: Date;
+  /** 报告语言，默认中文 */
+  locale?: Locale;
 }
 
 const SEVERITY_ORDER: Record<ReportSection["severity"], number> = { error: 0, warning: 1, info: 2 };
-
-const SEVERITY_LABEL: Record<ReportSection["severity"], string> = { error: "错误", warning: "警告", info: "提示" };
-
-const CONFIDENCE_LABEL: Record<ReportSection["confidence"], string> = { high: "高", medium: "中", low: "低" };
 
 function escapeHtml(s: string): string {
   return s
@@ -28,8 +27,27 @@ function escapeHtml(s: string): string {
     .replaceAll("'", "&#39;");
 }
 
+/** 位置列文案：文案在目录里，拼装逻辑仍在 core（单一来源） */
+function locationLabels(locale: Locale): LocationLabels {
+  const data: Record<string, string> = {};
+  for (const key of ["system", "actor", "commonEvent", "tileset", "enemy", "animation", "troop", "item", "skill"]) {
+    data[key] = t(locale, `report.data.${key}`);
+  }
+  return {
+    map: t(locale, "report.location.map"),
+    event: t(locale, "report.location.event"),
+    page: t(locale, "report.location.page"),
+    command: t(locale, "report.location.command"),
+    unknown: t(locale, "report.location.unknown"),
+    sep: t(locale, "report.location.sep"),
+    data,
+  };
+}
+
 export function renderReport(input: RenderInput): string {
   const { ir, sections, fingerprint, loadWarnings, pluginErrors, generatedAt = new Date() } = input;
+  const locale = input.locale ?? DEFAULT_LOCALE;
+  const locLabels = locationLabels(locale);
   const sorted = [...sections].sort(
     (a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity] || a.type.localeCompare(b.type),
   );
@@ -39,11 +57,11 @@ export function renderReport(input: RenderInput): string {
   const rows = sorted
     .map(
       (s) => `<tr class="sev-${s.severity}">
-<td class="sev">${SEVERITY_LABEL[s.severity]}</td>
+<td class="sev">${escapeHtml(t(locale, `report.severity.${s.severity}`))}</td>
 <td class="type">${escapeHtml(s.type)}</td>
-<td class="conf">${CONFIDENCE_LABEL[s.confidence]}</td>
-<td class="loc">${escapeHtml(formatLocation(s.location))}</td>
-<td class="msg">${escapeHtml(s.message)}</td>
+<td class="conf">${escapeHtml(t(locale, `report.confidence.${s.confidence}`))}</td>
+<td class="loc">${escapeHtml(formatLocation(s.location, locLabels))}</td>
+<td class="msg">${escapeHtml(localizeMessage(s, locale))}</td>
 <td class="ev">${s.evidence ? `<pre>${escapeHtml(JSON.stringify(s.evidence, null, 2))}</pre>` : ""}</td>
 </tr>`,
     )
@@ -56,18 +74,20 @@ export function renderReport(input: RenderInput): string {
   const loadWarningRows = loadWarnings.map((w) => `<li>${escapeHtml(w)}</li>`).join("\n");
 
   const events = ir.maps.reduce((n, m) => n + m.events.length, 0);
+  const heading = escapeHtml(t(locale, "report.heading", { project: ir.system.title }));
 
   return `<!doctype html>
-<html lang="zh-CN">
+<html lang="${BCP47[locale]}">
 <head>
 <meta charset="utf-8">
-<title>rmtest 报告 — ${escapeHtml(ir.system.title)}</title>
+<title>${heading}</title>
 <style>
   body { font-family: "Segoe UI", "Microsoft YaHei", sans-serif; margin: 24px; color: #222; }
   h1 { font-size: 20px; }
   .meta { color: #666; font-size: 13px; margin-bottom: 16px; }
   .summary span { margin-right: 16px; font-weight: bold; }
   .summary .error { color: #c0392b; } .summary .warning { color: #b9770e; } .summary .info { color: #2471a3; }
+  .incomplete { background: #fdf0ef; border: 1px solid #f0c4bf; color: #8c2b20; padding: 8px 10px; font-size: 13px; margin: 12px 0; }
   table { border-collapse: collapse; width: 100%; font-size: 13px; }
   th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; vertical-align: top; }
   th { background: #f4f4f4; }
@@ -77,21 +97,35 @@ export function renderReport(input: RenderInput): string {
 </style>
 </head>
 <body>
-<h1>rmtest 报告 — ${escapeHtml(ir.system.title)}</h1>
+<h1>${heading}</h1>
 <div class="meta">
-  引擎 ${ir.engine} · 地图 ${ir.maps.length} · 事件 ${events} · 开关 ${ir.system.switches.length - 1} · 变量 ${ir.system.variables.length - 1}<br>
-  内容指纹 ${escapeHtml(fingerprint)} · 生成时间 ${generatedAt.toLocaleString("zh-CN")}
+  ${escapeHtml(
+    t(locale, "report.meta", {
+      engine: ir.engine,
+      maps: ir.maps.length,
+      events,
+      switches: ir.system.switches.length - 1,
+      variables: ir.system.variables.length - 1,
+    }),
+  )}<br>
+  ${escapeHtml(
+    t(locale, "report.metaFingerprint", {
+      fingerprint,
+      time: generatedAt.toLocaleString(BCP47[locale]),
+    }),
+  )}
 </div>
 <div class="summary">
-  <span class="error">错误 ${counts.error}</span><span class="warning">警告 ${counts.warning}</span><span class="info">提示 ${counts.info}</span>
+  <span class="error">${escapeHtml(t(locale, "report.count.error", { count: counts.error }))}</span><span class="warning">${escapeHtml(t(locale, "report.count.warning", { count: counts.warning }))}</span><span class="info">${escapeHtml(t(locale, "report.count.info", { count: counts.info }))}</span>
 </div>
-${pluginErrors.length > 0 ? `<h2>插件错误（${pluginErrors.length}）</h2><ul>${pluginErrorRows}</ul>` : ""}
-${loadWarnings.length > 0 ? `<h2>加载警告（${loadWarnings.length}）</h2><ul>${loadWarningRows}</ul>` : ""}
-<h2>检查结果（${sorted.length}）</h2>
+${pluginErrors.length > 0 ? `<div class="incomplete">${escapeHtml(t(locale, "report.incomplete"))}</div>` : ""}
+${pluginErrors.length > 0 ? `<h2>${escapeHtml(t(locale, "report.pluginErrors", { count: pluginErrors.length }))}</h2><ul>${pluginErrorRows}</ul>` : ""}
+${loadWarnings.length > 0 ? `<h2>${escapeHtml(t(locale, "report.loadWarnings", { count: loadWarnings.length }))}</h2><ul>${loadWarningRows}</ul>` : ""}
+<h2>${escapeHtml(t(locale, "report.results", { count: sorted.length }))}</h2>
 <table>
-<thead><tr><th>严重度</th><th>类型</th><th>置信度</th><th>位置</th><th>说明</th><th>证据</th></tr></thead>
+<thead><tr><th>${escapeHtml(t(locale, "report.col.severity"))}</th><th>${escapeHtml(t(locale, "report.col.type"))}</th><th>${escapeHtml(t(locale, "report.col.confidence"))}</th><th>${escapeHtml(t(locale, "report.col.location"))}</th><th>${escapeHtml(t(locale, "report.col.message"))}</th><th>${escapeHtml(t(locale, "report.col.evidence"))}</th></tr></thead>
 <tbody>
-${rows || `<tr><td colspan="6">未发现问题 🎉</td></tr>`}
+${rows || `<tr><td colspan="6">${escapeHtml(t(locale, "report.none"))}</td></tr>`}
 </tbody>
 </table>
 </body>

@@ -1,22 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { Cmd } from "@rmtest/core";
 import { parseData } from "../src/parse.ts";
-import { encodeMarshal } from "./marshal-helpers.ts";
+import { encodeMarshal, encodeTablePayload } from "./marshal-helpers.ts";
 
 const sym = (s: string) => ({ $sym: s });
 const obj = (cls: string, ivars: Record<string, unknown>) => ({ $obj: { cls, ivars } });
 const hash = (pairs: Array<[unknown, unknown]>) => ({ $hash: pairs });
 
-/** VX Ace Table 字节：头 5×int32（dims,xsize,ysize,zsize,count）+ int16 LE 数据 */
+/** VX Ace Table 字节：真实 RGSS 'u'（_dump）编码 = 0x75 + 符号 Table + 长度 + 头 5×int32 + int16 LE 数据 */
 function table(data: number[]): unknown {
-  const bytes: number[] = [];
-  const i32 = (v: number) => [v & 0xff, (v >> 8) & 0xff, (v >> 16) & 0xff, (v >> 24) & 0xff];
-  bytes.push(...i32(1), ...i32(data.length), ...i32(1), ...i32(1), ...i32(data.length));
-  for (const v of data) {
-    const u = v < 0 ? v + 0x10000 : v;
-    bytes.push(u & 0xff, (u >> 8) & 0xff);
-  }
-  return { $user: { cls: "Table", bytes } };
+  return { $utable: { cls: "Table", payload: encodeTablePayload(data) } };
 }
 
 /** 构造最小 VX Ace 工程数据（合成 Marshal 字节） */

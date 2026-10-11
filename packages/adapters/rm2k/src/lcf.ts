@@ -24,6 +24,11 @@ export class LcfReader {
     return this.pos;
   }
 
+  /** 剩余可读字节数（越界读取后恒为 0） */
+  get remaining(): number {
+    return Math.max(0, this.buf.length - this.pos);
+  }
+
   peek(): number {
     return this.buf[this.pos] ?? -1;
   }
@@ -32,22 +37,38 @@ export class LcfReader {
     this.pos = Math.min(this.pos + n, this.buf.length);
   }
 
-  /** BER 压缩整数 */
+  /** BER 压缩整数；已越过缓冲区末尾时返回 0 且不再前进（防止位置飘出缓冲） */
   readInt(): number {
     let value = 0;
     for (let i = 0; i < 5; i++) {
-      const b = this.buf[this.pos++];
-      if (b === undefined) return 0;
+      if (this.pos >= this.buf.length) return 0;
+      const b = this.buf[this.pos++]!;
       value = (value << 7) | (b & 0x7f);
       if ((b & 0x80) === 0) return value >>> 0;
     }
     return 0;
   }
 
+  /**
+   * 把数据声明的元素计数钳制到字节预算内。LCF 的集合计数来自不可信文件
+   * （最大 0xFFFFFFFF），直接按声明值循环会 OOM/挂起；钳制后集合循环的
+   * 迭代次数与输入字节线性相关。
+   * @param count 数据中声明的元素数
+   * @param minBytes 单个元素至少占用的字节数（默认 1）
+   * @param budget 元素可用的字节预算，默认整个剩余缓冲（内部再与剩余字节取小）
+   */
+  boundedCount(count: number, minBytes = 1, budget = this.remaining): number {
+    if (!(count > 0)) return 0;
+    const bytes = Math.max(0, Math.min(budget, this.remaining));
+    const cap = Math.floor(bytes / (minBytes > 0 ? minBytes : 1));
+    return count < cap ? count : cap;
+  }
+
   /** UTF-8 优先，非法序列回退 latin1（2k/2k3 本地代码页字节保底不丢） */
   readString(len: number): string {
-    const bytes = this.buf.subarray(this.pos, this.pos + len);
-    this.pos += len;
+    const n = Math.max(0, Math.min(len, this.remaining));
+    const bytes = this.buf.subarray(this.pos, this.pos + n);
+    this.pos += n;
     try {
       return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
     } catch {

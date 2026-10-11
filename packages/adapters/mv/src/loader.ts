@@ -26,11 +26,18 @@ export interface LoadedProject {
   warnings: string[];
 }
 
-/** 加密扩展名 → 原文扩展名映射（部署产物） */
+/** 加密扩展名 → 原文扩展名映射（部署产物）。
+ *  MV：.rpgmvp/.rpgmvo/.rpgmvm；MZ：原名后加下划线（.png_/.ogg_/.m4a_/.webm_/.mp4_） */
 const ENCRYPTED_EXT: Record<string, string> = {
   ".rpgmvp": ".png",
   ".rpgmvo": ".ogg",
   ".rpgmvm": ".m4v",
+  ".png_": ".png",
+  ".ogg_": ".ogg",
+  ".m4a_": ".m4a",
+  ".m4v_": ".m4v",
+  ".webm_": ".webm",
+  ".mp4_": ".mp4",
 };
 
 const ASSET_DIRS = ["img", "audio", "movies", "fonts"] as const;
@@ -70,9 +77,12 @@ export function loadProject(dir: string, engine: "mv" | "mz" = "mv"): LoadedProj
     fileHashes.set(`data/${name}`, hashBytes(new TextEncoder().encode(JSON.stringify(content))));
   }
 
-  // 图标数量：IconSet.png 每格 32px
+  // 图标数量：IconSet.png 每格 iconCellSize px（MV/MZ 为 32）
   const iconSet = assets.find((a) => a.relPath.toLowerCase() === "img/system/iconset.png");
-  if (iconSet) universe.iconCount = Math.floor(iconSet.width / 32) * Math.floor(iconSet.height / 32);
+  if (iconSet) {
+    universe.iconCount =
+      Math.floor(iconSet.width / universe.iconCellSize) * Math.floor(iconSet.height / universe.iconCellSize);
+  }
 
   return { ir, universe, assets, fingerprint: fingerprintTree(fileHashes), fileHashes, warnings };
 }

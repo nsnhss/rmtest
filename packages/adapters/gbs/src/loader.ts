@@ -85,7 +85,16 @@ export function loadProject(dir: string): LoadedProject {
 
   // 资产存在性核对（相对工程根 = .gbsproj 所在目录）
   for (const asset of section.assetFiles) {
-    const diskPath = path.join(dir, asset.filename.replaceAll("/", path.sep));
+    // 安全闸门：工程文件不可信，拒绝绝对路径与含空/./.. 段的 filename，避免目录穿越读取
+    const raw = asset.filename;
+    const absolute = path.isAbsolute(raw) || /^[A-Za-z]:/.test(raw) || raw.startsWith("/") || raw.startsWith("\\");
+    const segments = raw.split(/[\\/]/);
+    const safe = !absolute && segments.every((s) => s.length > 0 && s !== "." && s !== "..");
+    if (!safe) {
+      warnings.push(`资产路径非法（疑似目录穿越），已跳过: ${raw}`);
+      continue;
+    }
+    const diskPath = path.join(dir, raw.replaceAll("/", path.sep));
     asset.exists = existsSync(diskPath) && statSync(diskPath).isFile();
     if (!asset.exists) {
       // 大小写不敏感匹配

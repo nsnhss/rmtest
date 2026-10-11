@@ -111,9 +111,13 @@ export function loadProject(dir: string): LoadedProject {
   for (const [sub, prefix] of Object.entries(GRAPHICS_MAP)) collect(path.join("Graphics", sub), prefix, false);
   for (const [sub, prefix] of Object.entries(AUDIO_MAP)) collect(path.join("Audio", sub), prefix, true);
 
-  // 图标数量：System/IconSet.png
+  // 图标数量：System/IconSet.png。VX Ace/XP 单格 24px（实测 384×1536 → 16×64=1024 格；按 MV 的 32px 只算 576 会误报）
+  universe.iconCellSize = 24;
   const iconSet = assets.find((a) => a.relPath.toLowerCase() === "img/system/iconset.png");
-  if (iconSet) universe.iconCount = Math.floor(iconSet.width / 32) * Math.floor(iconSet.height / 32);
+  if (iconSet) {
+    universe.iconCount =
+      Math.floor(iconSet.width / universe.iconCellSize) * Math.floor(iconSet.height / universe.iconCellSize);
+  }
 
   const fingerprint = hashBytes(new TextEncoder().encode([...fileHashes.entries()].map(([p, h]) => `${p}:${h}`).sort().join("\n")));
 

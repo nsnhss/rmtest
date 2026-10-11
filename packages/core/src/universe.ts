@@ -25,6 +25,8 @@ export interface GameUniverse {
   animationIds: Set<number>;
   /** IconSet 图标总数；0 = 未知（IconSet 缺失） */
   iconCount: number;
+  /** IconSet 单格边长（px）：MV/MZ 32；VX Ace/XP 24。新引擎接入时按实测设置 */
+  iconCellSize: number;
 }
 
 export function universeFromIR(ir: IRDocument): GameUniverse {
@@ -46,5 +48,6 @@ export function universeFromIR(ir: IRDocument): GameUniverse {
     tilesetIds: new Set(ir.tilesets.map((t) => t.id)),
     animationIds: new Set(ir.animations.map((a) => a.id)),
     iconCount: 0,
+    iconCellSize: 32,
   };
 }

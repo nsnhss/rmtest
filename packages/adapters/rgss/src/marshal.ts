@@ -4,7 +4,7 @@
  * 覆盖 RGSS 数据需要的子集：
  * - 标量：nil / true / false / fixnum / 字符串 / 符号（含符号表引用）/ 浮点
  * - 容器：数组 / 哈希 / 对象（类名 + ivars）
- * - bignum 与 UserDefined 按原始字节透传（如 Table 类型，RGSS 适配器暂不解析）
+ * - bignum 按原始字节透传；UserDefined 支持 'U'（marshal_dump）与 'u'（_dump，Table 等）
  *
  * 格式依据 Ruby marshal.c 的公开格式文档；解析容错：未知标签抛错而非猜测。
  */
@@ -24,6 +24,9 @@ class Reader {
   #buf: Uint8Array;
   #pos = 0;
   #symbols: string[] = [];
+  /** 对象表：可链接对象按首次出现顺序登记，'@' 链接按此索引取回同一实例 */
+  #objects: MarshalValue[] = [];
+  #depth = 0;
 
   constructor(buf: Uint8Array) {
     this.#buf = buf;
@@ -40,17 +43,17 @@ class Reader {
     return out;
   }
 
-  /** Marshal long（长度/计数编码：无标签的 fixnum 编码） */
+  /** Marshal long（长度/计数/整数值编码：有符号首字节 + 小端补码，与 ruby r_long 一致） */
   readLong(): number {
     const c = this.readByte();
     if (c === 0) return 0;
-    if (c > 4 && c < 128) return c - 5;
-    if (c > 128 && c < 252) return c - 256 + 5;
-    const len = c === 1 ? 1 : c === 2 ? 2 : c === 3 ? 3 : 4;
-    let v = 0;
-    for (let i = 0; i < len; i++) v |= this.readByte() << (8 * i);
-    if (c === 255) v = -v;
-    return v;
+    const sc = c > 127 ? c - 256 : c; // 首字节按 signed char 解释
+    if (sc > 4 && sc < 128) return sc - 5;
+    if (sc > -129 && sc < -4) return sc + 5;
+    const len = sc > 0 ? sc : -sc; // 1..4 字节小端
+    let u = 0;
+    for (let i = 0; i < len; i++) u += this.readByte() * 2 ** (8 * i);
+    return sc < 0 ? u - 2 ** (8 * len) : u;
   }
 
   readSymbol(): string {
@@ -59,7 +62,18 @@ class Reader {
     return new TextDecoder().decode(bytes);
   }
 
+  /** 递归入口：限制嵌套深度，坏流深嵌套降级为描述性错误而非栈溢出 */
   parseValue(): MarshalValue {
+    if (this.#depth >= 1000) throw new Error("Marshal 嵌套层级超过上限 1000");
+    this.#depth++;
+    try {
+      return this.#readValue();
+    } finally {
+      this.#depth--;
+    }
+  }
+
+  #readValue(): MarshalValue {
     const tag = this.readByte();
     switch (tag) {
       case 0x30: // '0'
@@ -90,8 +104,17 @@ class Reader {
         return this.parseFloatValue();
       case 0x6c: // 'l' bignum → 透传为原始（数值很大时用 bigint）
         return this.parseBignum();
-      case 0x55: // 'U' user-defined
+      case 0x55: // 'U' user-defined（marshal_dump）
         return this.parseUserDefined();
+      case 0x75: // 'u' userdef（_dump，真实 RGSS 的 Table 走此路径）
+        return this.parseUserDefinedBytes();
+      case 0x40: {
+        // '@' 对象链接：引用对象表中已登记的对象，返回同一实例
+        const index = this.readLong();
+        const linked = this.#objects[index];
+        if (linked === undefined) throw new Error(`对象链接索引 ${index} 越界`);
+        return linked;
+      }
       case 0x3b: {
         // ';' 符号表引用
         const index = this.parseFixnum();
@@ -105,20 +128,14 @@ class Reader {
   }
 
   parseFixnum(): number {
-    const c = this.readByte();
-    if (c === 0) return 0;
-    if (c > 4 && c < 128) return c - 5;
-    if (c > 128 && c < 252) return c - 256 + 5;
-    const len = c === 1 ? 1 : c === 2 ? 2 : c === 3 ? 3 : 4;
-    let v = 0;
-    for (let i = 0; i < len; i++) v |= this.readByte() << (8 * i);
-    if (c === 255) v = -v;
-    return v;
+    return this.readLong();
   }
 
   parseRawString(): string {
     const len = this.readLong();
-    return new TextDecoder().decode(this.readBytes(len));
+    const str = new TextDecoder().decode(this.readBytes(len));
+    this.#objects.push(str); // String 可被 '@' 链接
+    return str;
   }
 
   parseTaggedString(): string {
@@ -135,6 +152,7 @@ class Reader {
   parseArray(): MarshalValue[] {
     const count = this.readLong();
     const out: MarshalValue[] = [];
+    this.#objects.push(out); // 先登记再读子元素，支持自引用
     for (let i = 0; i < count; i++) out.push(this.parseValue());
     return out;
   }
@@ -142,32 +160,42 @@ class Reader {
   parseHash(): { $pairs: Array<[MarshalValue, MarshalValue]> } {
     const count = this.readLong();
     const pairs: Array<[MarshalValue, MarshalValue]> = [];
+    const out = { $pairs: pairs };
+    this.#objects.push(out); // 先登记再读键值对，支持自引用
     for (let i = 0; i < count; i++) {
       const key = this.parseValue();
       const value = this.parseValue();
       pairs.push([key, value]);
     }
-    return { $pairs: pairs };
+    return out;
   }
 
   parseObject(): { $class: string; $ivars: Map<string, MarshalValue> } {
     const cls = this.parseValue();
-    const className = typeof cls === "string" || "$symbol" in (cls as object) ? symbolOf(cls) : "Object";
+    // 类槽位可能为 nil / 非对象（坏流或紧凑写法）：显式判空，避免裸 TypeError
+    const className =
+      typeof cls === "string" || (cls !== null && typeof cls === "object" && "$symbol" in cls)
+        ? symbolOf(cls)
+        : "Object";
     const count = this.readLong();
     const ivars = new Map<string, MarshalValue>();
+    const obj = { $class: className, $ivars: ivars };
+    this.#objects.push(obj); // 先登记再读 ivars，支持对象自引用
     for (let i = 0; i < count; i++) {
       const key = this.parseValue();
       const value = this.parseValue();
       ivars.set(symbolOf(key), value);
     }
-    return { $class: className, $ivars: ivars };
+    return obj;
   }
 
   parseFloatValue(): number {
     const len = this.readLong();
     const str = new TextDecoder().decode(this.readBytes(len));
     const v = Number(str);
-    return Number.isFinite(v) ? v : 0;
+    const out = Number.isFinite(v) ? v : 0;
+    this.#objects.push(out); // Float 可被 '@' 链接
+    return out;
   }
 
   parseBignum(): bigint {
@@ -175,25 +203,58 @@ class Reader {
     const words = this.readLong() * 2;
     let v = 0n;
     for (let i = 0; i < words; i++) v |= BigInt(this.readByte()) << BigInt(8 * i);
-    return sign * v;
+    const out = sign * v;
+    this.#objects.push(out); // Bignum 可被 '@' 链接
+    return out;
   }
 
+  /** 'U'（marshal_dump）：类符号 + 普通 Marshal 值；RGSS 中 Table 实为 'u'，此路径保留兼容 */
   parseUserDefined(): { $user: string; $bytes: Uint8Array } {
     const cls = this.parseValue();
     const className = symbolOf(cls);
     if (className === "Table") {
-      // Table._dump：头 20 字节（5×int32）内含 count → 精确消费
-      const header = this.#buf.subarray(this.#pos, this.#pos + 20);
-      this.#pos += 20;
-      const count = header[16]! | (header[17]! << 8) | (header[18]! << 16) | (header[19]! << 24);
-      const data = this.#buf.subarray(this.#pos, this.#pos + count * 2);
-      this.#pos += count * 2;
-      const bytes = new Uint8Array(header.length + data.length);
-      bytes.set(header, 0);
-      bytes.set(data, header.length);
-      return { $user: className, $bytes: bytes };
+      const out = this.#readTable(this.#buf.length - this.#pos);
+      this.#objects.push(out);
+      return out;
     }
     throw new Error(`不支持 UserDefined 类 ${className}`);
+  }
+
+  /** 'u'（_dump）：类符号 + Marshal long 长度前缀 + 定长字节串 —— 真实 RGSS Table._dump 格式 */
+  parseUserDefinedBytes(): { $user: string; $bytes: Uint8Array } {
+    const cls = this.parseValue();
+    const className = symbolOf(cls);
+    const declared = this.readLong();
+    if (declared < 0) throw new Error(`UserDefined 字节串长度非法：${declared}`);
+    // 声明长度可能超出剩余缓冲：按剩余字节夹取，避免越界读
+    const limit = Math.min(declared, Math.max(0, this.#buf.length - this.#pos));
+    // 载荷为不透明字节串，不登记；_dump 对象本身在载荷之后登记（与 Ruby w_remember 顺序一致）
+    const out =
+      className === "Table"
+        ? this.#readTable(limit)
+        : { $user: className, $bytes: new Uint8Array(this.readBytes(limit)) }; // Color/Tone 等按字节透传
+    this.#objects.push(out);
+    return out;
+  }
+
+  /**
+   * Table._dump 载荷解码：头 20 字节（5×int32，[16..19] 为元素个数）+ count×int16 LE。
+   * 读取受 `limit` 约束（'u' 用声明长度，'U' 用剩余缓冲），count 由载荷头决定。
+   */
+  #readTable(limit: number): { $user: string; $bytes: Uint8Array } {
+    const at = this.#pos;
+    const headerLen = Math.max(0, Math.min(20, Math.max(0, limit), this.#buf.length - at));
+    const header = this.#buf.subarray(at, at + headerLen);
+    const count =
+      headerLen >= 20 ? header[16]! | (header[17]! << 8) | (header[18]! << 16) | (header[19]! << 24) : 0;
+    // 数据偏移夹取非负，避免负 count 回退读取位置
+    const dataLen = Math.min(Math.max(0, count * 2), Math.max(0, limit - headerLen));
+    const data = this.#buf.subarray(at + headerLen, at + headerLen + dataLen);
+    const bytes = new Uint8Array(headerLen + dataLen);
+    bytes.set(header, 0);
+    bytes.set(data, headerLen);
+    this.#pos += headerLen + dataLen;
+    return { $user: "Table", $bytes: bytes };
   }
 }
 

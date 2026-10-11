@@ -42,3 +42,33 @@
 - 不做叙事/审美判断（AI 可"标记可疑"，确定性工具不"判定"）
 - 不承诺"覆盖 Unity/UE"：IR 只服务数据驱动引擎（RPG/VN）；编译型引擎是另一套技术
 - 动态层只服务有可自动化运行时（浏览器/开源解释器）的引擎；原生 exe 注入式驱动不做
+
+## 修复轮（2026-10-11，评估驱动）
+
+依据评估发现的问题逐条修复，全部带回归测试（修复前失败 / 修复后通过），真实工程实测：
+
+| 缺陷 | 修复 | 证据 |
+|---|---|---|
+| MV/MZ 加密资源用 `encryptionKey` 的 ASCII 字节做密钥流 → 加密工程全部解不开 | 改为十六进制解码的 16 字节；补 MZ 的 `.png_/.ogg_/.m4a_` 后缀映射 | 真实 MV/MZ 工程：解出 PNG 魔数、资源尺寸全部可解析（新增 `RM_REAL_PROJECT` 门控用例） |
+| RGSS 只支持 `U`(0x55) 而真实流用 `u`(0x75)；`readLong` 未按 Ruby 补码语义 → 156 个 `.rvdata` 中大量整文件丢弃 | 0x75 + 长度前缀；Ruby `r_long` 精确实现；Marshal 对象链接 `@`(0x40) 对象表；嵌套深度护栏 | 真实 VX Ace 工程 156/156 文件解析成功，141 张地图带真实图块数据 |
+| RM2k LCF 向量计数直接采信 BER 声明值（16 字节输入可申请 40 亿对象 → OOM） | 所有计数按剩余字节/块长钳制 | 16 字节 LMU 声明 200000/4e9 → 结果有界（0 个事件），时间线性 |
+| GB Studio `.gbsproj` 资产文件名可路径穿越（任意本地文件读 + 目录列举）；资源容器只认数组（4.x 为 id-keyed 对象） | 绝对路径/`..` 段拒绝；容器双形态归一 | 恶意工程用例：越界文件不被读、不记哈希；id-keyed 场景与数组等价 |
+| GBS/Godot/GB 检查器误报：rm2k 地图树 `visited` 跨图共享、Godot `^` 当祖先查找、first-run-false 忽略页面门控、四检查器漏扫公共事件、CJK 正则缺谚文 | 逐条修正（各带修复前失败用例） | `packages/checkers/test/*` |
+| `walkPathTo` 通行位取反（用移动方向的位查目标格）→ 穿墙/假不可达，且源格未检查 | 目标格用反向位、补源格检查；方向表单一来源 | 非门控单测（stub `$gameMap`）+ 单向瓦片用例 |
+| `hardenPage` 从未接线（网络封锁只在自测里生效）；fuzz 以挂钟截断 → 种子不可复现 | 真实引擎加载路径接线并暴露拦截统计；步数预算为主界、挂钟仅安全上限（`truncated` 标记） | `runtime/test/{security,fuzz,real-fuzz}.test.ts` 双跑一致性 |
+| CLI `pnpm scan <目录>` 扫的是 cwd（argv 错位）；带值选项与取值被拆散；`pnpm deploy/run` 与 pnpm 内建命令冲突 | 隐式 scan 归一化（保留选项-取值配对）；补齐脚本；`deploy:check` / `scene:run` 改名 | `cli/test/main-entry.test.ts`（含 pnpm 透传形态与 `--checkers` 取值回归） |
+| 插件生态文档声称"已接入 scan"但生产零调用；irVersion 闸门不存在 | `scan --checkers <目录>` 真接入；加载期 irVersion 闸门；加载错误可本地化 | 端到端：插件产出进入报告；irVersion=99 被拒并给出四语言错误 |
+| `text-overflow` 单位不一致（半角单位宽 vs 整字容量）→ 真实工程刷出 10365 条误报 | 统一像素度量；仅 MV/MZ 生效（其它引擎窗口度量未建模，空转） | 真实 VX Ace 工程：12825 → 2345 条，误报类别归零 |
+| 图标网格按 MV 的 32px 计，VX Ace 是 24px → 112 条图标越界误报 | `GameUniverse.iconCellSize`（MV/MZ 32、VX Ace/XP 24，实测依据） | 真实工程 384×1536 → 1024 格 ≥ 最大 iconIndex 1005，误报归零 |
+| 无 CI | `.github/workflows/ci.yml`（typecheck + 全量测试，Windows 运行器） | — |
+| 界面仅中文 | 新增 `@rmtest/i18n`：zh/ja/ko/en 全量目录（报告 / CLI / 桌面 / 检查器 / 插件加载错误），CLI `--lang`、`RMTEST_LANG`、桌面语言选择器 | 报告与桌面四语言实测；桌面真实窗口切换 en/ja/ko 断言 |
+
+## 已知限制（当前轮未做）
+
+- **VX Ace/XP 的显示层检查未建模**：`text-overflow`（窗口 544 宽、字号更小）与 `asset-dimension`（行走图 96×128 等）按引擎空转；补测需先实测该引擎度量。
+- **VX Ace 图块通行度**（chipsets passable_data）与 2k/2k3 的 chipsets passable_data 暂缓，软锁判定只用「四向全阻挡」近似。
+- **动态层 Windows-only**：CLI/桌面硬编码 `node_modules/electron/dist/electron.exe`。
+- **真实引擎 E2E 默认跳过**：需 `RM_REAL_PROJECT`，CI 无真机故只跑确定性层。
+- **`picture-offscreen` 对 origin=0 只查上界**，负锚点不报（低置信启发式，未改）。
+- **覆盖度无门槛**：`pnpm coverage` 仅出报告（当前行 72.27% / 分支 59.64%，已含 6 个适配器），未设阈值。
+

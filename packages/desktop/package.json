@@ -8,6 +8,7 @@
     "@rmtest/cli": "workspace:*",
     "@rmtest/core": "workspace:*",
     "@rmtest/dsl": "workspace:*",
+    "@rmtest/i18n": "workspace:*",
     "@rmtest/store": "workspace:*"
   },
   "devDependencies": {

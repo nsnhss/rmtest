@@ -106,6 +106,22 @@ describe("工程加载器", () => {
     }
   });
 
+  it("MZ 加密资源(.png_)解密读尺寸并映射回 .png", () => {
+    const assets = fullAssets();
+    delete assets["img/faces/Actor1.png"];
+    assets["img/faces/Actor1.png_"] = encryptAsset(makePng(144, 144), ENC_KEY);
+    const p = buildProject(assets);
+    try {
+      const loaded = loadProject(p.dir, "mz");
+      expect(loaded.universe.assetFiles.has("img/faces/Actor1.png")).toBe(true);
+      const face = loaded.assets.find((a) => a.relPath === "img/faces/Actor1.png")!;
+      expect(face).toMatchObject({ width: 144, height: 144 });
+      expect(loaded.warnings).toEqual([]);
+    } finally {
+      p.destroy();
+    }
+  });
+
   it("缺 data/ 目录 → 警告而非崩溃", () => {
     const p = buildProject({});
     try {

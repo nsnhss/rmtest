@@ -166,4 +166,39 @@ describe("现代格式（4.3+）解析", () => {
     expect(section.scenes[0]!.actors[0]!.prefabId).toBe("prefab-1");
     expect(section.scenes[0]!.playerSpriteSheetId).toBe("sprite-1");
   });
+
+  it("id 为键的对象资源与数组等价（GB Studio 3+/4.x 真实格式）", () => {
+    const scene = MODERN.scenes[0]!;
+    const asObjects = parseProject({
+      ...MODERN,
+      scenes: { "scene-1": scene },
+      scripts: {
+        "ce-1": { _resourceType: "script", id: "ce-1", name: "过场", script: [{ command: "EVENT_CALL_CUSTOM_EVENT", args: { customEventId: "ce-2" } }] },
+      },
+      actorPrefabs: { "prefab-1": { _resourceType: "actorPrefab", id: "prefab-1", name: "P" } },
+      sprites: { "sprite-1": { _resourceType: "sprite", id: "sprite-1", name: "player", filename: "assets/sprites/player.png" } },
+    });
+    const asArrays = parseProject({
+      ...MODERN,
+      scenes: [scene],
+      scripts: [
+        { _resourceType: "script", id: "ce-1", name: "过场", script: [{ command: "EVENT_CALL_CUSTOM_EVENT", args: { customEventId: "ce-2" } }] },
+      ],
+      actorPrefabs: [{ _resourceType: "actorPrefab", id: "prefab-1", name: "P" }],
+      sprites: [{ _resourceType: "sprite", id: "sprite-1", name: "player", filename: "assets/sprites/player.png" }],
+    });
+
+    expect(asObjects.warnings).toEqual([]);
+    expect(asObjects.section.scenes).toEqual(asArrays.section.scenes);
+    expect(asObjects.section.scenes).toHaveLength(1);
+    expect(asObjects.section.scenes[0]!.actors).toHaveLength(1);
+    expect(asObjects.section.customEvents).toEqual(asArrays.section.customEvents);
+    expect(asObjects.section.customEvents[0]!.id).toBe("ce-1");
+    expect(asObjects.section.actorPrefabIds).toEqual(["prefab-1"]);
+    expect(asObjects.section.spriteIds).toEqual(["sprite-1"]);
+    expect(asObjects.section.assetFiles.map((a) => a.filename)).toEqual([
+      "assets/backgrounds/bg.png",
+      "assets/sprites/player.png",
+    ]);
+  });
 });

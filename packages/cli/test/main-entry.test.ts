@@ -94,10 +94,78 @@ describe("CLI 入口黑盒", () => {
     }
   });
 
-  it("未知命令 → 帮助输出且不崩溃", () => {
-    const r = runCli(["nonexistent-command"], repoRoot);
-    expect(r.status).toBeLessThanOrEqual(1);
-    expect(r.stdout.length + r.stderr.length).toBeGreaterThan(0);
+  it("带值选项与取值不被拆散：--checkers <目录> 时仍扫工程目录并真正加载插件", () => {
+    const dir = buildMiniProject();
+    const pluginDir = mkdtempSync(path.join(tmpdir(), "rmtest-cli-plugins-"));
+    // 插件对每张地图产出一条 info：出现 PLUGIN-MARKER 即证明插件被加载并执行。
+    // 归一化若把选项与取值拆开（历史缺陷），--checkers 的取值会被当成工程目录或丢失 → 断言失败。
+    writeFileSync(
+      path.join(pluginDir, "marker.ts"),
+      `export default {
+  manifest: { name: "marker", version: "0.1.0", irVersion: 1, facts: [] },
+  check: (_facts, ir) => ir.maps.map((m) => ({ type: "marker", severity: "info", confidence: "low", message: "PLUGIN-MARKER map " + m.id })),
+};
+`,
+    );
+    try {
+      const r = runCli(["scan", dir, "--checkers", pluginDir], repoRoot);
+      const html = readFileSync(path.join(dir, "rmtest-report.html"), "utf8");
+      expect(html, `stderr: ${r.stderr}`).toContain("PLUGIN-MARKER map 1");
+      expect(r.stdout).toContain("提示 2"); // 两张地图 → 两条 info
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+      rmSync(pluginDir, { recursive: true, force: true });
+    }
+  });
+
+  it("--lang 生效：英文输出（带值选项与取值相邻解析）", () => {
+    const dir = buildMiniProject();
+    try {
+      const r = runCli([dir, "--lang", "en"], repoRoot);
+      expect(r.stdout).toContain("Report:"); // 未生效时是「报告:」
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("pnpm 透传形态：main.ts <目录>（无动词）→ 扫描该目录而非进程 cwd", () => {
+    const dir = buildMiniProject();
+    try {
+      // package.json 的 `pnpm scan` 只透传工程目录：argv[2] 是目录而非动词。
+      // 修好前：cmd 落到目录上 → 扫 cwd（仓库根），退出码 0 且报告写在仓库根；
+      // 修好后：补隐式 scan → 扫 dir，退出码 1（mini 有悬空引用错误），报告写在 dir。
+      const r = runCli([dir], repoRoot);
+      expect(r.status, `stderr: ${r.stderr} stdout: ${r.stdout}`).toBe(1);
+      expect(r.stdout).toContain("报告");
+      expect(readdirSync(dir)).toContain("rmtest-report.html");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+      rmSync(path.join(repoRoot, "rmtest-report.html"), { force: true }); // 清掉回归演示可能留下的旧报告
+    }
+  });
+
+  it("无参数 → 隐式 scan 当前目录（.）", () => {
+    const stray = path.join(repoRoot, "rmtest-report.html");
+    try {
+      const r = runCli([], repoRoot);
+      expect(r.status, `stderr: ${r.stderr} stdout: ${r.stdout}`).toBe(0); // 仓库根非游戏工程 → 0 错误
+      expect(r.stdout).toContain("报告");
+      expect(readdirSync(repoRoot)).toContain("rmtest-report.html");
+    } finally {
+      rmSync(stray, { force: true });
+    }
+  });
+
+  it("首参是选项（--flag）→ 不当成目录；其后的位置参数才是工程目录", () => {
+    const dir = buildMiniProject();
+    try {
+      const r = runCli(["--incremental", dir], repoRoot);
+      expect(r.status, `stderr: ${r.stderr} stdout: ${r.stdout}`).toBe(1);
+      expect(r.stdout).toContain("报告");
+      expect(readdirSync(dir)).toContain("rmtest-report.html");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it("deploy：非部署目录 → 错误路径不崩溃", () => {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import os from "node:os";
 import { findProjectFile, loadProject } from "../src/loader.ts";
@@ -122,6 +123,52 @@ describe("GB Studio 工程加载", () => {
       expect(p.warnings.some((w) => w.includes("JSON 解析失败"))).toBe(true);
     } finally {
       rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("目录穿越 filename → 拒绝并跳过（不读取/哈希工程根之外的文件）", () => {
+    const base = tmpDir();
+    const dir = path.join(base, "proj");
+    mkdirSync(dir, { recursive: true });
+    // 工程根之外的真实文件：若加载器不设防会被读取并哈希
+    const secret = path.join(base, "outside.png");
+    const secretBytes = "outside-secret-bytes";
+    writeFileSync(secret, secretBytes);
+    const secretHash = createHash("sha256").update(secretBytes).digest("hex").slice(0, 16);
+
+    const crafted = {
+      ...PROJECT,
+      spriteSheets: [
+        { id: "sprite-evil-1", name: "evil1", filename: "../outside.png" },
+        { id: "sprite-evil-2", name: "evil2", filename: "../../../../outside.png" },
+        { id: "sprite-abs", name: "abs", filename: "/etc/passwd" },
+      ],
+      backgrounds: [],
+      tilesets: [],
+      sounds: [],
+      music: [],
+      emotes: [],
+      avatars: [],
+      fonts: [],
+      palettes: [],
+    };
+    writeFileSync(path.join(dir, "demo.gbsproj"), JSON.stringify(crafted));
+    try {
+      const p = loadProject(dir);
+      // 仅 .gbsproj 被读取/哈希；外部文件未被读取
+      expect([...p.fileHashes.keys()]).toEqual(["demo.gbsproj"]);
+      expect([...p.fileHashes.values()]).not.toContain(secretHash);
+      expect(p.universe.assetFiles.size).toBe(0);
+      expect(p.universe.assetFilesLower.size).toBe(0);
+      expect(p.assets).toEqual([]);
+      // 每个非法条目都记录一条中文警告
+      const skipped = p.warnings.filter((w) => w.includes("目录穿越"));
+      expect(skipped).toHaveLength(3);
+      expect(skipped.every((w) => w.includes("已跳过"))).toBe(true);
+      // 场景仍正常解析
+      expect(p.ir.gbs!.scenes).toHaveLength(1);
+    } finally {
+      rmSync(base, { recursive: true, force: true });
     }
   });
 });

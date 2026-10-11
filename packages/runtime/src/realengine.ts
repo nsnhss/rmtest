@@ -11,9 +11,12 @@ import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { connect, type Browser, type Page } from "puppeteer-core";
 import { closeCdp, launchElectron, type CdpSession } from "./cdp.ts";
+import { hardenPage, type HardeningStats } from "./security.ts";
 
 export interface RealGameSession extends CdpSession {
   page: Page;
+  /** 页面加固统计：外部请求被 abort 并记录于此 */
+  hardening: HardeningStats;
 }
 
 export interface RealSnapshot {
@@ -36,9 +39,30 @@ export interface RealSnapshot {
   dataMapHeight: number;
 }
 
+/**
+ * 瓦片通行方向位（RPG Maker MV/MZ 语义的单一真源）。
+ *
+ * `Game_Map.checkPassage(x, y, bit)` 的 bit：1=下 / 2=左 / 4=右 / 8=上。
+ * 引擎 `Game_Character.prototype.isMapPassable(x, y, d)` 的判定为：
+ * 源格按移动方向 d 检查、目标格按反向 d2 = reverseDir(d) 检查。因此：
+ * - moveBit：离开源格时按移动方向检查的位；
+ * - enterBit：进入目标格时按反向（进入方向）检查的位。
+ *
+ * 上：moveBit 8 / enterBit 1；下：moveBit 1 / enterBit 8；
+ * 左：moveBit 2 / enterBit 4；右：moveBit 4 / enterBit 2。
+ */
+export const MOVE_DIRS: ReadonlyArray<{ dx: number; dy: number; moveBit: number; enterBit: number }> = [
+  { dx: 0, dy: -1, moveBit: 8, enterBit: 1 }, // 上：自下而进入
+  { dx: 0, dy: 1, moveBit: 1, enterBit: 8 }, // 下：自上而进入
+  { dx: -1, dy: 0, moveBit: 2, enterBit: 4 }, // 左：自右而进入
+  { dx: 1, dy: 0, moveBit: 4, enterBit: 2 }, // 右：自左而进入
+];
+
 export const REAL_BRIDGE = `(() => {
   if (window.__rmtestReal) return "exists";
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  // 通行位表由 Node 侧 MOVE_DIRS 注入（单一真源）：bit 1=下/2=左/4=右/8=上
+  const MOVE_DIRS = ${JSON.stringify(MOVE_DIRS)};
   window.__rmtestReal = {
     ready() {
       return typeof DataManager !== "undefined" && DataManager.isDatabaseLoaded()
@@ -104,21 +128,20 @@ export const REAL_BRIDGE = `(() => {
       const startX = $gamePlayer._x, startY = $gamePlayer._y;
       const w = $gameMap.width(), h = $gameMap.height();
       const key = (x, y) => x + "," + y;
-      // 方向位：1下/2左/4右/8上；checkPassage(x,y,bit) true = 该方向可进
-      const dirs = [[0, -1, 8], [0, 1, 1], [-1, 0, 2], [1, 0, 4]];
       const from = new Map();
       const visited = new Set([key(startX, startY)]);
       const queue = [[startX, startY]];
       while (queue.length > 0) {
         const [cx, cy] = queue.shift();
         if (cx === tx && cy === ty) break;
-        for (const [dx, dy, bit] of dirs) {
-          const nx = cx + dx, ny = cy + dy;
+        for (const d of MOVE_DIRS) {
+          const nx = cx + d.dx, ny = cy + d.dy;
           if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
           const k = key(nx, ny);
           if (visited.has(k)) continue;
-          // checkPassage(x, y, bit): bit = 进入方向（2下/4左/6右/8上），true = 可进
-          if (!$gameMap.checkPassage(nx, ny, bit)) continue;
+          // 引擎 isMapPassable 语义：源格按移动方向检查，目标格按反向（进入方向）检查
+          if (!$gameMap.checkPassage(cx, cy, d.moveBit)) continue;
+          if (!$gameMap.checkPassage(nx, ny, d.enterBit)) continue;
           visited.add(k);
           from.set(k, key(cx, cy));
           queue.push([nx, ny]);
@@ -239,9 +262,12 @@ export async function launchRealGame(projectDir: string, opts: RealGameOptions):
     throw new Error("游戏页面未就绪");
   }
 
+  // 页面就绪后立即加固：只放行 file:/data:/about:/blob:，拦截一切外部请求并记录
+  const hardening = await hardenPage(page);
+
   // 注入桥（幂等）
   await page.evaluate(REAL_BRIDGE);
-  return { browser, proc, port, page };
+  return { browser, proc, port, page, hardening };
 }
 
 /** 轮询等待数据库加载完成（游戏启动） */

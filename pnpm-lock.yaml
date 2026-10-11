@@ -244,6 +244,9 @@ importers:
       '@rmtest/core':
         specifier: workspace:*
         version: link:../core
+      '@rmtest/i18n':
+        specifier: workspace:*
+        version: link:../i18n
     devDependencies:
       '@rmtest/adapter-gbs':
         specifier: workspace:*
@@ -296,6 +299,9 @@ importers:
       '@rmtest/freshness':
         specifier: workspace:*
         version: link:../freshness
+      '@rmtest/i18n':
+        specifier: workspace:*
+        version: link:../i18n
       '@rmtest/report':
         specifier: workspace:*
         version: link:../report
@@ -350,6 +356,9 @@ importers:
       '@rmtest/dsl':
         specifier: workspace:*
         version: link:../dsl
+      '@rmtest/i18n':
+        specifier: workspace:*
+        version: link:../i18n
       '@rmtest/store':
         specifier: workspace:*
         version: link:../store
@@ -376,11 +385,16 @@ importers:
         specifier: workspace:*
         version: link:../dsl
 
+  packages/i18n: {}
+
   packages/report:
     dependencies:
       '@rmtest/core':
         specifier: workspace:*
         version: link:../core
+      '@rmtest/i18n':
+        specifier: workspace:*
+        version: link:../i18n
 
   packages/runtime:
     dependencies:

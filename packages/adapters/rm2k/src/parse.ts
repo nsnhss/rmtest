@@ -110,11 +110,12 @@ export function parseLmt(bytes: Uint8Array): ParsedLmt {
   const r = new LcfReader(bytes);
   r.readString(r.readInt()); // 头字符串（"LcfMapTree"，消费帧）
   const maps: IRRm2kMapInfo[] = [];
-  const count = r.readInt();
+  // 每元素至少 [BER 元素 id][结构终止 0] = 2 字节
+  const count = r.boundedCount(r.readInt(), 2);
   for (let i = 0; i < count; i++) {
     maps.push(readMapInfo(r, r.readInt()));
   }
-  const treeOrderCount = r.readInt();
+  const treeOrderCount = r.boundedCount(r.readInt(), 1);
   for (let i = 0; i < treeOrderCount; i++) r.readInt();
   r.readInt(); // active_node
   const start = readStart(r);
@@ -124,7 +125,7 @@ export function parseLmt(bytes: Uint8Array): ParsedLmt {
 /* ---- LMU（结构块） ---- */
 
 function readCommands(r: LcfReader, len: number): IRRm2kCommand[] {
-  const end = r.position + len;
+  const end = r.position + Math.min(len, r.remaining);
   const out: IRRm2kCommand[] = [];
   while (r.position < end) {
     if (r.peek() === 0) {
@@ -137,7 +138,9 @@ function readCommands(r: LcfReader, len: number): IRRm2kCommand[] {
     const str = r.readString(r.readInt());
     const n = r.readInt();
     const parameters: number[] = [];
-    for (let i = 0; i < n; i++) parameters.push(r.readInt());
+    // 参数至少各占 1 字节，且不得越过命令载荷末尾
+    const paramCount = r.boundedCount(n, 1, end - r.position);
+    for (let i = 0; i < paramCount; i++) parameters.push(r.readInt());
     out.push({ code, indent, string: str, parameters, page: -1 });
   }
   r.skip(end - r.position);
@@ -196,8 +199,9 @@ function readEvent(r: LcfReader, id: number): IRRm2kEvent {
     0x03: () => {
       ev.y = r.readInt();
     },
-    0x05: () => {
-      const count = r.readInt();
+    0x05: (len) => {
+      // 每页至少 [BER 页 id][结构终止 0] = 2 字节，且不超过本块载荷
+      const count = r.boundedCount(r.readInt(), 2, len);
       for (let i = 0; i < count; i++) {
         r.readInt(); // 页 id
         ev.pages.push(readEventPage(r));
@@ -233,8 +237,9 @@ export function parseLmu(bytes: Uint8Array): ParsedLmu {
     0x20: (len) => {
       map.parallaxName = r.readString(len);
     },
-    0x51: () => {
-      const count = r.readInt();
+    0x51: (len) => {
+      // 每事件至少 [BER 事件 id][结构终止 0] = 2 字节，且不超过本块载荷
+      const count = r.boundedCount(r.readInt(), 2, len);
       for (let i = 0; i < count; i++) {
         map.events.push(readEvent(r, r.readInt()));
       }
@@ -278,44 +283,47 @@ export function parseLdb(bytes: Uint8Array): ParsedLdb {
         },
       });
     },
-    0x17: () => {
-      const count = r.readInt();
+    0x17: (len) => {
+      // 每元素至少 [BER id][结构终止 0] = 2 字节，且不超过本块载荷
+      const count = r.boundedCount(r.readInt(), 2, len);
       for (let i = 0; i < count; i++) {
         const id = r.readInt();
         let name = "";
         r.readStruct({
-          0x01: (len) => {
-            name = r.readString(len);
+          0x01: (l) => {
+            name = r.readString(l);
           },
         });
         if (id >= 1) db.switches[id - 1] = name;
       }
     },
-    0x18: () => {
-      const count = r.readInt();
+    0x18: (len) => {
+      // 每元素至少 [BER id][结构终止 0] = 2 字节，且不超过本块载荷
+      const count = r.boundedCount(r.readInt(), 2, len);
       for (let i = 0; i < count; i++) {
         const id = r.readInt();
         let name = "";
         r.readStruct({
-          0x01: (len) => {
-            name = r.readString(len);
+          0x01: (l) => {
+            name = r.readString(l);
           },
         });
         if (id >= 1) db.variables[id - 1] = name;
       }
     },
-    0x19: () => {
-      const count = r.readInt();
+    0x19: (len) => {
+      // 每元素至少 [BER id][结构终止 0] = 2 字节，且不超过本块载荷
+      const count = r.boundedCount(r.readInt(), 2, len);
       for (let i = 0; i < count; i++) {
         const id = r.readInt();
         let name = "";
         let commands: IRRm2kCommand[] = [];
         r.readStruct({
-          0x01: (len) => {
-            name = r.readString(len);
+          0x01: (l) => {
+            name = r.readString(l);
           },
-          0x16: (len) => {
-            commands = readCommands(r, len);
+          0x16: (l) => {
+            commands = readCommands(r, l);
           },
         });
         db.commonEvents.push({ id, name, commands });
@@ -324,29 +332,29 @@ export function parseLdb(bytes: Uint8Array): ParsedLdb {
     0x1a: () => {
       db.version = r.readInt();
     },
-    0x14: () => {
-      // chipsets：只取名字
-      const count = r.readInt();
+    0x14: (len) => {
+      // chipsets：只取名字；每元素至少 [BER id][结构终止 0] = 2 字节
+      const count = r.boundedCount(r.readInt(), 2, len);
       for (let i = 0; i < count; i++) {
         const id = r.readInt();
         let name = "";
         r.readStruct({
-          0x01: (len) => {
-            name = r.readString(len);
+          0x01: (l) => {
+            name = r.readString(l);
           },
         });
         if (id >= 1) db.chipsets[id] = name;
       }
     },
-    0x13: () => {
-      // animations：只取 Battle 动画文件名
-      const count = r.readInt();
+    0x13: (len) => {
+      // animations：只取 Battle 动画文件名；每元素至少 [BER id][结构终止 0] = 2 字节
+      const count = r.boundedCount(r.readInt(), 2, len);
       for (let i = 0; i < count; i++) {
         const id = r.readInt();
         let file = "";
         r.readStruct({
-          0x02: (len) => {
-            file = r.readString(len);
+          0x02: (l) => {
+            file = r.readString(l);
           },
         });
         if (id >= 1) db.animations[id] = file;

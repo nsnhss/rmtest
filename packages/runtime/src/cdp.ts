@@ -20,6 +20,18 @@ export interface LaunchOptions {
   timeoutMs?: number;
   /** 传给 Electron 进程的额外环境变量 */
   env?: Record<string, string>;
+  /** 传给 Electron 的额外 Chromium 开关（如 CI 无 GPU 环境的 --disable-gpu） */
+  extraArgs?: string[];
+}
+
+/**
+ * 额外 Chromium 开关：显式 extraArgs 优先，否则取环境变量 RMTEST_ELECTRON_ARGS（空格分隔）。
+ * 典型用途：无 GPU 的 CI/无头机器上 `RMTEST_ELECTRON_ARGS=--disable-gpu` 才能起窗口。
+ */
+function resolveExtraArgs(explicit?: string[]): string[] {
+  if (explicit) return explicit;
+  const raw = process.env["RMTEST_ELECTRON_ARGS"];
+  return raw ? raw.split(/\s+/).filter((a) => a.length > 0) : [];
 }
 
 /**
@@ -33,7 +45,8 @@ export async function launchElectron(
 ): Promise<CdpSession> {
   const port = opts.port ?? 9222;
   const timeoutMs = opts.timeoutMs ?? 60_000;
-  const proc = spawn(opts.electronPath, [opts.appDir, `--remote-debugging-port=${port}`], {
+  const extraArgs = resolveExtraArgs(opts.extraArgs);
+  const proc = spawn(opts.electronPath, [opts.appDir, `--remote-debugging-port=${port}`, ...extraArgs], {
     stdio: "ignore",
     env: { ...process.env, ...(opts.env ?? {}) },
   });

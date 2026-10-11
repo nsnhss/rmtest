@@ -27,4 +27,8 @@ jobs:
         run: pnpm exec vitest run --exclude "packages/runtime/test/**" --exclude "packages/desktop/test/**"
       - name: 动态层测试（Electron stub，不阻塞门禁）
         continue-on-error: true
+        timeout-minutes: 12
+        env:
+          # 无 GPU 的 runner 上 Electron 起不来（拿不到 page 目标）；软件渲染下可起
+          RMTEST_ELECTRON_ARGS: "--disable-gpu --disable-software-rasterizer"
         run: pnpm exec vitest run packages/runtime/test packages/desktop/test
